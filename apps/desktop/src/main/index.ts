@@ -28,7 +28,9 @@ const DEV_URL = process.env.MINICORD_DEV_URL;
 const APP_URL = DEV_URL ?? "minicord://app/index.html";
 // Unpackaged runs (dev, automated tests) get their own profile so they never touch the real one.
 if (!app.isPackaged) app.setPath("userData", join(app.getPath("appData"), "minicord-dev"));
-app.setAppUserModelId("dev.minicord.app");
+// Windows gives an app ID one taskbar icon, and Electron makes a Start menu shortcut for it the first
+// time it notifies. Dev runs get their own ID so the dev electron.exe can't take over the installed app's icon.
+app.setAppUserModelId(app.isPackaged ? "dev.minicord.app" : "dev.minicord.app.dev");
 
 protocol.registerSchemesAsPrivileged([{ scheme: "minicord", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 

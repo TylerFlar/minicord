@@ -41,6 +41,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The default list still includes the retired "tools" package; Gradle fetches platforms/build-tools itself.
+          packages: platform-tools
       - run: pnpm install --frozen-lockfile
       - run: chmod +x apps/android/android/gradlew
       - run: pnpm --filter @minicord/android sync

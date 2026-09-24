@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +15,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -56,12 +58,19 @@ class DiscordWebActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         mode = intent.getStringExtra(EXTRA_MODE) ?: "login"
         web = WebView(this)
-        setContentView(web)
-        ViewCompat.setOnApplyWindowInsetsListener(web) { v, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
+        // Android 15+ draws apps edge to edge. A WebView ignores its own padding when it draws, so the
+        // system bars are kept clear by a frame around it, where the dark theme's background shows.
+        val frame = FrameLayout(this).apply {
+            addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         }
+        setContentView(frame)
+        ViewCompat.setOnApplyWindowInsetsListener(frame) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        // No translucent scrim over the frame behind 3-button navigation.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         with(web.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true

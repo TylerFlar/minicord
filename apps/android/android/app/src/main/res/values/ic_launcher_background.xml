@@ -2,4 +2,5 @@
 <resources>
     <color name="ic_launcher_background">#3F7D70</color>
     <color name="minicord_background">#F6F4F0</color>
+    <color name="discord_web_bars">#1E1F22</color>
 </resources>

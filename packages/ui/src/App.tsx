@@ -82,6 +82,7 @@ export function App() {
     return (
       <div className="h-full" style={safeTop}>
         <LoginScreen />
+        <Toasts />
       </div>
     );
   if (!store.ready) return <Spinner label="Connecting…" />;

@@ -1012,8 +1012,8 @@ export class MinicordClient {
     this.update = status;
     this.signals.touch("update");
     const fresh = was.state !== status.state || was.version !== status.version;
-    if (fresh && status.state === "ready") this.toast(`minicord ${status.version} is ready`, "info", { label: "Restart", run: () => this.installUpdate() });
-    else if (fresh && status.state === "available") this.toast(`minicord ${status.version} is out`, "info", { label: "Download", run: () => this.installUpdate() });
+    if (fresh && status.state === "ready") this.toast(`minicord ${status.version} is ready`, "info", { label: "Restart", run: () => this.installUpdate() }, true);
+    else if (fresh && status.state === "available") this.toast(`minicord ${status.version} is out`, "info", { label: "Download", run: () => this.installUpdate() }, true);
     else if (!quiet && status.state === "none") this.toast("You're on the latest version.", "info");
     else if (!quiet && status.state === "error") this.toast("Couldn't check for updates.", "warn");
   }
@@ -1451,11 +1451,12 @@ export class MinicordClient {
 
   // ---- misc -----------------------------------------------------------------
 
-  toast(text: string, tone: Toast["tone"] = "info", action?: Toast["action"]): void {
+  /** Toasts fade after 7s; sticky ones (updates) wait to be dismissed. */
+  toast(text: string, tone: Toast["tone"] = "info", action?: Toast["action"], sticky = false): void {
     const toast: Toast = { id: crypto.randomUUID(), text, tone, ...(action ? { action } : {}) };
     this.toasts = [...this.toasts, toast].slice(-3);
     this.signals.touch("toasts");
-    setTimeout(() => this.dismissToast(toast.id), 7000);
+    if (!sticky) setTimeout(() => this.dismissToast(toast.id), 7000);
   }
 
   dismissToast(id: string): void {

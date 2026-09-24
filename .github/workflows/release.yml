@@ -1,0 +1,114 @@
+name: Release
+
+# Push a tag made by `pnpm release <version>` (e.g. v0.2.0). This builds the Windows installer and the
+# signed Android APK and publishes them as a GitHub release. Installed desktop apps update from there
+# (electron-updater reads latest.yml); the Android app checks the latest release and links the APK.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-version.mjs "$GITHUB_REF_NAME"
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  windows:
+    name: Windows installer
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm dist:win
+        env:
+          # No code-signing certificate: build unsigned instead of looking for one.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.exe.blockmap
+            apps/desktop/release/latest.yml
+
+  android:
+    name: Android APK
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: pnpm install --frozen-lockfile
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secrets; see 'Releases' in the README."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "MINICORD_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+      - run: chmod +x apps/android/android/gradlew
+      - run: pnpm dist:android
+        env:
+          MINICORD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MINICORD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MINICORD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - run: cp apps/android/android/app/build/outputs/apk/release/app-release.apk "minicord-${GITHUB_REF_NAME#v}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          path: minicord-*.apk
+
+  publish:
+    name: Publish release
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: minicord ${{ github.ref_name }}
+          files: out/*
+          generate_release_notes: true
+          body: |
+            **Windows:** download `minicord-Setup-*.exe` and run it. It isn't code-signed yet, so SmartScreen may ask: *More info → Run anyway*. The app updates itself from here afterwards.
+
+            **Android:** download `minicord-*.apk` on your phone and open it (allow installs from your browser when asked). The app tells you when a newer APK is out.

@@ -1,0 +1,53 @@
+{
+  "_comment": "Shared by packages/core (vitest) and apps/android (JUnit): how a message is directed at the current user.",
+  "context": {
+    "meId": "me",
+    "roles": { "g": ["r1"] },
+    "settings": { "g": { "suppress_everyone": false, "suppress_roles": false } }
+  },
+  "base": {
+    "id": "1",
+    "channel_id": "c",
+    "guild_id": "g",
+    "author": { "id": "other", "username": "other" },
+    "content": "",
+    "timestamp": "2026-09-23T12:00:00.000Z",
+    "mentions": [],
+    "mention_roles": [],
+    "mention_everyone": false,
+    "attachments": [],
+    "embeds": [],
+    "type": 0
+  },
+  "cases": [
+    { "name": "direct mention", "message": { "content": "hi <@me>", "mentions": [{ "id": "me" }] }, "expect": { "kind": "user", "pings": true } },
+    {
+      "name": "reply with ping",
+      "message": { "mentions": [{ "id": "me" }], "referenced_message": { "id": "0", "author": { "id": "me" } } },
+      "expect": { "kind": "reply", "pings": true }
+    },
+    {
+      "name": "reply with ping that also mentions explicitly",
+      "message": { "content": "<@me> yes", "mentions": [{ "id": "me" }], "referenced_message": { "id": "0", "author": { "id": "me" } } },
+      "expect": { "kind": "user", "pings": true }
+    },
+    { "name": "reply without ping", "message": { "referenced_message": { "id": "0", "author": { "id": "me" } } }, "expect": { "kind": "reply", "pings": false } },
+    { "name": "my role", "message": { "mention_roles": ["r1"] }, "expect": { "kind": "role", "pings": true } },
+    { "name": "someone else's role", "message": { "mention_roles": ["r2"] }, "expect": null },
+    { "name": "@everyone", "message": { "mention_everyone": true }, "expect": { "kind": "everyone", "pings": true } },
+    {
+      "name": "@everyone suppressed",
+      "settings": { "suppress_everyone": true, "suppress_roles": false },
+      "message": { "mention_everyone": true },
+      "expect": null
+    },
+    {
+      "name": "role mentions suppressed",
+      "settings": { "suppress_everyone": false, "suppress_roles": true },
+      "message": { "mention_roles": ["r1"] },
+      "expect": null
+    },
+    { "name": "own message", "message": { "author": { "id": "me" }, "mention_everyone": true }, "expect": null },
+    { "name": "nothing for me", "message": { "content": "hello all" }, "expect": null }
+  ]
+}

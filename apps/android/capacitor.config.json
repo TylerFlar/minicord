@@ -1,0 +1,14 @@
+{
+  "appId": "dev.minicord.app",
+  "appName": "minicord",
+  "webDir": "../../packages/ui/dist",
+  "android": {
+    "backgroundColor": "#f6f4f0",
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
+  }
+}

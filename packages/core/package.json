@@ -1,0 +1,30 @@
+{
+  "name": "@minicord/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./host": "./src/host/index.ts",
+    "./node": "./src/node.ts",
+    "./ipc": "./src/ipc.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "smoke": "tsx scripts/smoke.ts",
+    "smoke:write": "tsx scripts/smoke-write.ts",
+    "smoke:notify": "tsx scripts/smoke-notify.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1",
+    "ws": "^8.21.3"
+  }
+}

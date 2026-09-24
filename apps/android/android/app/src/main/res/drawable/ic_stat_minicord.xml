@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: the minicord speech bubble (monochrome). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,3.5C7,3.5 3,6.8 3,10.8c0,2.2 1.2,4.2 3.1,5.5L5.2,20.5l4.3,-2.5c0.8,0.2 1.6,0.2 2.5,0.2c5,0 9,-3.3 9,-7.4S17,3.5 12,3.5zM8.3,9.9h7.4v1.8H8.3z" />
+</vector>

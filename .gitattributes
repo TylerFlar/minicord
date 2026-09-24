@@ -1,0 +1,5 @@
+* text=auto
+# Shell scripts must keep LF to run on the Linux CI runners.
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf

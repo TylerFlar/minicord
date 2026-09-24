@@ -1,0 +1,72 @@
+{
+  "name": "@minicord/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A calm Discord client",
+  "author": "minicord",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "dist": "node scripts/build.mjs && electron-builder --win --publish never",
+    "typecheck": "tsc -p tsconfig.json",
+    "screenshots": "node scripts/readme-shots.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "devDependencies": {
+    "@minicord/core": "workspace:*",
+    "@minicord/ui": "workspace:*",
+    "@types/node": "^26.6.2",
+    "@types/ws": "^8.18.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
+    "esbuild": "^0.28.2",
+    "playwright-core": "1.63.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "ws": "^8.21.3"
+  },
+  "build": {
+    "appId": "dev.minicord.app",
+    "productName": "minicord",
+    "copyright": "minicord contributors",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "dist/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "minicord",
+      "artifactName": "minicord-Setup-${version}.${ext}",
+      "installerIcon": "dist/icons/icon.ico",
+      "uninstallerIcon": "dist/icons/icon.ico",
+      "installerHeaderIcon": "dist/icons/icon.ico",
+      "installerSidebar": "dist/icons/installerSidebar.bmp",
+      "uninstallerSidebar": "dist/icons/installerSidebar.bmp",
+      "installerHeader": "dist/icons/installerHeader.bmp",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TylerFlar",
+        "repo": "minicord",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "homepage": "https://github.com/TylerFlar/minicord"
+}

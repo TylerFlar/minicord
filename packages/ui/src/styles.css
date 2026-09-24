@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: var(--mc-bg);
+  --color-surface: var(--mc-surface);
+  --color-sunken: var(--mc-sunken);
+  --color-text: var(--mc-text);
+  --color-muted: var(--mc-muted);
+  --color-faint: var(--mc-faint);
+  --color-line: var(--mc-line);
+  --color-accent: var(--mc-accent);
+  --color-accent-soft: var(--mc-accent-soft);
+  --color-on-accent: var(--mc-on-accent);
+  --color-warn: var(--mc-warn);
+  --color-warn-soft: var(--mc-warn-soft);
+  --color-danger: var(--mc-danger);
+  --color-highlight: var(--mc-highlight);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace;
+}
+
+/* A warm, low-saturation palette: nothing here should compete for attention. */
+:root {
+  --mc-bg: #f6f4f0;
+  --mc-surface: #ffffff;
+  --mc-sunken: #efece6;
+  --mc-text: #2a2927;
+  --mc-muted: #74706a;
+  --mc-faint: #a9a49b;
+  --mc-line: #e6e1d9;
+  --mc-accent: #3f7d70;
+  --mc-accent-soft: #e2eeea;
+  --mc-on-accent: #ffffff;
+  --mc-warn: #9c6420;
+  --mc-warn-soft: #f6ead6;
+  --mc-danger: #b4533c;
+  --mc-highlight: #fbf1dc;
+  --mc-online: #3b9468;
+  --mc-idle: #cf9530;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mc-bg: #1b1b1d;
+    --mc-surface: #232326;
+    --mc-sunken: #18181a;
+    --mc-text: #e6e4e0;
+    --mc-muted: #9b978f;
+    --mc-faint: #6b6862;
+    --mc-line: #323135;
+    --mc-accent: #74b3a5;
+    --mc-accent-soft: #23322e;
+    --mc-on-accent: #0e1916;
+    --mc-warn: #d8a35a;
+    --mc-warn-soft: #362d21;
+    --mc-danger: #e0866f;
+    --mc-highlight: #342d20;
+    --mc-online: #4fb685;
+    --mc-idle: #dca84a;
+    color-scheme: dark;
+  }
+}
+
+/* Element defaults live in the base layer so Tailwind utilities can override them. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--mc-bg);
+    color: var(--mc-text);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Quiet scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mc-line) transparent;
+  }
+
+  ::selection {
+    background: var(--mc-accent-soft);
+  }
+}
+
+@layer components {
+  .spoiler {
+    background: var(--mc-muted);
+    color: transparent;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .spoiler.revealed {
+    background: var(--mc-sunken);
+    color: inherit;
+    cursor: text;
+  }
+
+  /* Discord-style typing indicator */
+  .typing-dots {
+    display: inline-flex;
+    gap: 3px;
+  }
+  .typing-dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--mc-muted);
+    animation: typing 1.2s infinite ease-in-out;
+  }
+  .typing-dots i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing-dots i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  @keyframes typing {
+    0%,
+    60%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .typing-dots i {
+      animation: none;
+    }
+  }
+
+  /* The pass pause: a slow breathe in (4 s) and out (6 s). */
+  .breathe {
+    animation: breathe 10s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(0.55);
+      opacity: 0.55;
+    }
+    40% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .breathe {
+      animation: none;
+      transform: scale(0.85);
+    }
+  }
+
+  /* Discord-style mention pills */
+  .mention {
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 500;
+    color: var(--mc-accent);
+    background: var(--mc-accent-soft);
+    cursor: pointer;
+  }
+  .mention:hover {
+    color: var(--mc-on-accent);
+    background: var(--mc-accent);
+  }
+}

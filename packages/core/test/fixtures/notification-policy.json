@@ -1,0 +1,67 @@
+{
+  "_comment": "Shared by packages/core (vitest) and apps/android (JUnit) so both notification policies behave identically. Times are local wall-clock.",
+  "config": {
+    "defaultMode": "vault",
+    "guildModes": { "vault": "vault", "open": "open" },
+    "passMinutes": 10,
+    "passExtensionMinutes": 5,
+    "manualPassesPerDay": 3,
+    "cooldownHours": 24,
+    "vaultMentionDelivery": "instant",
+    "vaultIgnoreEveryone": true,
+    "openNotify": "mentions",
+    "quietHours": { "enabled": true, "start": "23:00", "end": "08:00" },
+    "digestTimes": ["12:00", "18:00"]
+  },
+  "base": {
+    "meId": "me",
+    "authorId": "friend",
+    "isDM": false,
+    "mention": null,
+    "mutedByDiscord": false,
+    "authorBlocked": false,
+    "viewingChannel": false,
+    "now": "2026-09-23T14:00"
+  },
+  "cases": [
+    { "name": "DMs notify", "input": { "isDM": true }, "expect": { "action": "notify", "category": "dm" } },
+    { "name": "muted DMs stay quiet", "input": { "isDM": true, "mutedByDiscord": true }, "expect": { "action": "none" } },
+    { "name": "blocked authors stay quiet", "input": { "isDM": true, "authorBlocked": true }, "expect": { "action": "none" } },
+    { "name": "the open conversation stays quiet", "input": { "isDM": true, "viewingChannel": true }, "expect": { "action": "none" } },
+    { "name": "own messages stay quiet", "input": { "isDM": true, "authorId": "me" }, "expect": { "action": "none" } },
+    { "name": "open-server chatter stays quiet", "input": { "guildId": "open" }, "expect": { "action": "none" } },
+    { "name": "vault chatter stays quiet", "input": { "guildId": "vault" }, "expect": { "action": "none" } },
+    { "name": "unsorted servers default to vault", "input": { "guildId": "new", "mention": { "kind": "everyone", "pings": true } }, "expect": { "action": "none" } },
+    { "name": "direct ping from a vault notifies", "input": { "guildId": "vault", "mention": { "kind": "user", "pings": true } }, "expect": { "action": "notify", "category": "mention" } },
+    {
+      "name": "vault pings can be batched into a digest",
+      "config": { "vaultMentionDelivery": "digest" },
+      "input": { "guildId": "vault", "mention": { "kind": "role", "pings": true } },
+      "expect": { "action": "digest", "category": "mention" }
+    },
+    { "name": "@everyone in a vault is ignored", "input": { "guildId": "vault", "mention": { "kind": "everyone", "pings": true } }, "expect": { "action": "none" } },
+    { "name": "@everyone in an open server notifies", "input": { "guildId": "open", "mention": { "kind": "everyone", "pings": true } }, "expect": { "action": "notify", "category": "mention" } },
+    { "name": "a non-ping reply stays quiet", "input": { "guildId": "vault", "mention": { "kind": "reply", "pings": false } }, "expect": { "action": "none" } },
+    { "name": "a ping in a muted open server stays quiet", "input": { "guildId": "open", "mention": { "kind": "user", "pings": true }, "mutedByDiscord": true }, "expect": { "action": "none" } },
+    {
+      "name": "open servers can follow Discord's all-messages setting",
+      "config": { "openNotify": "discord" },
+      "input": { "guildId": "open", "discordLevel": 0 },
+      "expect": { "action": "notify", "category": "message" }
+    },
+    {
+      "name": "following Discord's mentions-only setting stays quiet",
+      "config": { "openNotify": "discord" },
+      "input": { "guildId": "open", "discordLevel": 1 },
+      "expect": { "action": "none" }
+    },
+    { "name": "quiet hours hold a late-night DM until morning", "input": { "isDM": true, "now": "2026-09-23T23:30" }, "expect": { "action": "hold", "category": "dm", "until": "2026-09-24T08:00" } },
+    { "name": "quiet hours hold an early-morning ping", "input": { "guildId": "vault", "mention": { "kind": "user", "pings": true }, "now": "2026-09-23T03:00" }, "expect": { "action": "hold", "category": "mention", "until": "2026-09-23T08:00" } },
+    {
+      "name": "quiet hours can be turned off",
+      "config": { "quietHours": { "enabled": false, "start": "23:00", "end": "08:00" } },
+      "input": { "isDM": true, "now": "2026-09-23T23:30" },
+      "expect": { "action": "notify", "category": "dm" }
+    }
+  ]
+}

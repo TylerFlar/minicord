@@ -5,6 +5,7 @@ export * from "./util/proto.ts";
 export * from "./permissions.ts";
 export * from "./mentions.ts";
 export * from "./events.ts";
+export * from "./posted.ts";
 export * from "./properties.ts";
 export * from "./gateway/client.ts";
 export * from "./gateway/socket.ts";

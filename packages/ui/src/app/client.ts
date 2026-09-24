@@ -2,13 +2,16 @@ import {
   ChannelType,
   classifyMention,
   decodeFavoriteGifs,
+  dedupePostedEvents,
   DiscordApi,
   DiscordApiError,
   encodeStatusSettings,
+  eventChannelScore,
   eventStart,
   GatewayOp,
   isUpcomingOrLive,
   makeNonce,
+  postedEvents,
   rules as R,
   snowflakeToMs,
   Store,
@@ -27,6 +30,7 @@ import {
   type MentionKind,
   type Message,
   type Platform,
+  type PostedEvent,
   type ScheduledEvent,
   type SelectComponent,
   type UpdateStatus,
@@ -145,6 +149,7 @@ export class MinicordClient {
   readonly pendingComponents = new Set<string>();
   #lastMemberSub = "";
   #favoriteGifs: Promise<FavoriteGif[]> | null = null;
+  #posted = new WeakMap<Message, PostedEvent[]>();
 
   constructor(platform: Platform) {
     this.platform = platform;
@@ -224,6 +229,7 @@ export class MinicordClient {
     this.signals.touch("route", "status", "ready");
     void this.#refreshMentions();
     void this.#refreshRsvps();
+    void this.#loadEventChannels();
     this.#updateBadge();
   }
 
@@ -584,6 +590,7 @@ export class MinicordClient {
   /** Vault gate for a guild channel, including the short grace period after a pass ends. */
   accessOf(channel: Channel): { allowed: boolean; pass?: R.Pass; grace?: boolean } {
     if (!channel.guild_id || R.modeOf(this.rules.config, channel.guild_id) === "open") return { allowed: true };
+    if (R.isEventChannel(this.rules.config, channel.id, channel.parent_id)) return { allowed: true };
     const now = Date.now();
     const pass =
       R.activePass(this.rules, channel.id, now) ?? (channel.parent_id ? R.activePass(this.rules, channel.parent_id, now) : undefined);
@@ -1392,9 +1399,61 @@ export class MinicordClient {
   // ---- rules ----------------------------------------------------------------
 
   #setRules(next: R.RulesState): void {
+    const added = Object.keys(next.config.eventChannels).some((id) => !(id in this.rules.config.eventChannels));
     this.rules = next;
     void this.platform.storage.save(RULES_KEY, next);
     this.signals.touch("rules");
+    if (added && this.store.ready) void this.#loadEventChannels();
+  }
+
+  // ---- event channels ---------------------------------------------------------
+
+  /** Keep the latest posts of every event channel loaded (the gateway keeps them current after that). */
+  async #loadEventChannels(): Promise<void> {
+    for (const channelId of Object.keys(this.rules.config.eventChannels)) {
+      const channel = this.store.channels.get(channelId);
+      if (channel && this.store.canView(channel)) await this.openChannel(channelId);
+    }
+  }
+
+  isEventChannel(channel: Channel): boolean {
+    return R.isEventChannel(this.rules.config, channel.id, channel.parent_id);
+  }
+
+  setEventChannel(channel: Channel, on: boolean): void {
+    const guildId = channel.guild_id;
+    if (!guildId) return;
+    this.requestChange({ kind: "eventChannel", guildId, channelId: channel.id, on });
+    // Closing the event channel you're reading in a vaulted server sends you back to its vault.
+    const r = this.route;
+    if (!on && r.view === "server" && r.channelId === channel.id && !this.accessOf(channel).allowed) this.navigate({ view: "vault", guildId });
+  }
+
+  /** Dated posts from event channels that aren't already Discord events, soonest first. */
+  postedEvents(): PostedEvent[] {
+    const all: PostedEvent[] = [];
+    for (const [channelId, guildId] of Object.entries(this.rules.config.eventChannels)) {
+      for (const message of this.store.messagesOf(channelId)?.messages ?? []) {
+        let events = this.#posted.get(message);
+        if (!events) this.#posted.set(message, (events = postedEvents(message, guildId)));
+        all.push(...events);
+      }
+    }
+    return dedupePostedEvents(all, (id) => this.store.events.has(id));
+  }
+
+  /** Channels that look like where a server posts its events, best first (visible, not already chosen or pending). */
+  eventChannelSuggestions(guildId: string, limit = 3): Channel[] {
+    const pending = new Set(R.pendingEventChannels(this.rules, guildId).map((p) => p.change.channelId));
+    return this.store
+      .guildChannelGroups(guildId)
+      .flatMap((g) => g.channels)
+      .filter((c) => !(c.id in this.rules.config.eventChannels) && !pending.has(c.id))
+      .map((c) => ({ c, score: eventChannelScore(c) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((x) => x.c);
   }
 
   requestChange(change: R.Change): void {

@@ -1,25 +1,27 @@
-import { isInPerson, isUpcomingOrLive, rules as R, snowflakeToMs, sortByStart, type PermissionState } from "@minicord/core";
+import { isInPerson, isPhysicalLocation, rules as R, snowflakeToMs, type PermissionState } from "@minicord/core";
 import { BellRing, Hourglass, Lock, Sun, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar } from "../components/Avatar.tsx";
-import { EventCard } from "../components/EventCard.tsx";
+import { usePostedEvents } from "../components/PostedEventCard.tsx";
 import { Count } from "../components/Sidebar.tsx";
 import { Button, SectionTitle } from "../components/ui.tsx";
 import type { InboxItem } from "../app/client.ts";
 import { useClient, useNow, useSignals, useStore } from "../app/context.tsx";
 import { formatStamp } from "../lib/format.ts";
 import { messagePreview } from "../lib/preview.ts";
+import { AgendaCard, agendaItems } from "./Events.tsx";
 
 export function InboxScreen() {
   const client = useSignals(["inbox", "rules"]);
   const store = useStore(["dms", "readstates", "events", "guilds", "channels"]);
+  const posted = usePostedEvents();
   const now = useNow(60_000);
   const unread = store.unreadDms();
   const items = client.visibleInbox();
-  const upcoming = sortByStart([...store.events.values()].filter((e) => isUpcomingOrLive(e, now)));
-  const soon = upcoming.filter((e) => Date.parse(e.scheduled_start_time) - now < 7 * 86_400_000);
+  const upcoming = agendaItems([...store.events.values()], posted, now);
+  const soon = upcoming.filter((i) => i.start - now < 7 * 86_400_000);
   const caughtUp = unread.length === 0 && items.length === 0;
-  const nextInPerson = upcoming.find(isInPerson);
+  const nextInPerson = upcoming.find((i) => (i.kind === "discord" ? isInPerson(i.event) : isPhysicalLocation(i.event.location)));
 
   return (
     <div className="flex-1 overflow-y-auto bg-surface">
@@ -41,7 +43,7 @@ export function InboxScreen() {
             <div className="text-[17px] font-semibold">You're caught up</div>
             {nextInPerson && (
               <div className="mt-4 text-left">
-                <EventCard event={nextInPerson} compact />
+                <AgendaCard item={nextInPerson} compact />
               </div>
             )}
             <Button className="mt-5" onClick={() => client.done()}>
@@ -93,8 +95,8 @@ export function InboxScreen() {
               This week
             </SectionTitle>
             <div className="flex flex-col gap-2">
-              {soon.slice(0, 4).map((e) => (
-                <EventCard key={e.id} event={e} compact />
+              {soon.slice(0, 4).map((i) => (
+                <AgendaCard key={`${i.kind}:${i.id}`} item={i} compact />
               ))}
             </div>
           </>

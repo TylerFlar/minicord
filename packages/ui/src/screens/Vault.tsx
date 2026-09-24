@@ -1,17 +1,20 @@
-import { ChannelType, isUpcomingOrLive, rules as R, sortByStart } from "@minicord/core";
+import { ChannelType, rules as R } from "@minicord/core";
 import { ArrowLeft, Clock, DoorOpen, Hourglass, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GuildIcon } from "../components/Avatar.tsx";
-import { EventCard } from "../components/EventCard.tsx";
+import { EventChannels } from "../components/EventChannels.tsx";
+import { usePostedEvents } from "../components/PostedEventCard.tsx";
 import { Button, IconButton, SectionTitle } from "../components/ui.tsx";
 import { useNow, useSignals, useStore } from "../app/context.tsx";
 import { formatCountdown, formatDuration, formatPause, formatStamp } from "../lib/format.ts";
 import { useIsMobile } from "../lib/responsive.ts";
+import { AgendaCard, agendaItems } from "./Events.tsx";
 import { InboxRow } from "./Inbox.tsx";
 
 export function VaultScreen({ guildId }: { guildId: string }) {
   const client = useSignals(["rules", "inbox"]);
   const store = useStore(["guilds", `channels:${guildId}`, "events"]);
+  const posted = usePostedEvents();
   const now = useNow(1000);
   const guild = store.guilds.get(guildId);
   const mobile = useIsMobile();
@@ -25,11 +28,16 @@ export function VaultScreen({ guildId }: { guildId: string }) {
   const { rules } = client;
   const pending = R.pendingFor(rules, guildId);
   const items = client.visibleInbox().filter((i) => i.guildId === guildId);
-  const events = sortByStart([...store.events.values()].filter((e) => e.guild_id === guildId && isUpcomingOrLive(e, now)));
+  const events = agendaItems(
+    [...store.events.values()].filter((e) => e.guild_id === guildId),
+    posted.filter((e) => e.guildId === guildId),
+    now,
+  );
+  // Event channels are readable without a pass, so the pass picker leaves them out.
   const textChannels = store
     .guildChannelGroups(guildId)
     .flatMap((g) => g.channels)
-    .filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement);
+    .filter((c) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) && !client.isEventChannel(c));
   const left = R.manualPassesLeft(rules, now);
   const active = R.activePasses(rules, now).filter((p) => p.guildId === guildId);
   const history = rules.passes.filter((p) => p.guildId === guildId && p.endedAt !== undefined).slice(-5).reverse();
@@ -95,14 +103,17 @@ export function VaultScreen({ guildId }: { guildId: string }) {
           <>
             <SectionTitle>Events</SectionTitle>
             <div className="flex flex-col gap-2">
-              {events.map((e) => (
-                <EventCard key={e.id} event={e} />
+              {events.map((i) => (
+                <AgendaCard key={`${i.kind}:${i.id}`} item={i} />
               ))}
             </div>
           </>
         )}
 
         {!items.length && !events.length && <div className="rounded-lg bg-bg px-4 py-6 text-center text-[14px] text-muted">Nothing for you here.</div>}
+
+        <SectionTitle>Event channels</SectionTitle>
+        <EventChannels guildId={guildId} />
 
         <SectionTitle
           action={

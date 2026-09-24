@@ -149,6 +149,42 @@ describe("passes", () => {
   });
 });
 
+describe("event channels", () => {
+  const on = (guildId: string, channelId: string) => ({ kind: "eventChannel" as const, guildId, channelId, on: true });
+
+  it("opening one in a vaulted server waits out the cooldown; in an open server, or before onboarding, it's instant", () => {
+    const vaulted = rules.requestChange(onboarded({ guildModes: { g1: "vault" } }), on("g1", "events"), T0, "c1");
+    expect(vaulted.outcome).toBe("pending");
+    expect(rules.isEventChannel(vaulted.state.config, "events")).toBe(false);
+    expect(rules.pendingEventChannels(vaulted.state, "g1").map((p) => p.change.channelId)).toEqual(["events"]);
+    expect(rules.isEventChannel(rules.applyDue(vaulted.state, T0 + 24 * HOUR).config, "events")).toBe(true);
+
+    const open = rules.requestChange(onboarded({ guildModes: { g2: "open" } }), on("g2", "calendar"), T0, "c2");
+    expect(open.outcome).toBe("applied");
+
+    const sorting = rules.requestChange(rules.initialRulesState(), on("g1", "events"), T0, "c3");
+    expect(sorting.outcome).toBe("applied");
+  });
+
+  it("closing one is instant and cancels a pending open", () => {
+    let s = rules.requestChange(onboarded({ guildModes: { g1: "vault" } }), on("g1", "events"), T0, "c1").state;
+    s = rules.requestChange(s, { kind: "eventChannel", guildId: "g1", channelId: "events", on: false }, T0, "c2").state;
+    expect(s.pending).toHaveLength(0);
+
+    s = onboarded({ guildModes: { g1: "vault" }, eventChannels: { events: "g1" } });
+    const closed = rules.requestChange(s, { kind: "eventChannel", guildId: "g1", channelId: "events", on: false }, T0, "c3");
+    expect(closed.outcome).toBe("applied");
+    expect(rules.isEventChannel(closed.state.config, "events")).toBe(false);
+  });
+
+  it("stays readable in a vaulted server without a pass, threads included", () => {
+    const s = onboarded({ guildModes: { g1: "vault" }, eventChannels: { events: "g1" } });
+    expect(rules.canViewChannel(s, "g1", "events", T0)).toBe(true);
+    expect(rules.canViewChannel(s, "g1", "thread", T0, "events")).toBe(true);
+    expect(rules.canViewChannel(s, "g1", "general", T0)).toBe(false);
+  });
+});
+
 describe("notification policy", () => {
   const base = (patch: Partial<rules.NotifyInput> = {}): rules.NotifyInput => ({
     config: { ...rules.DEFAULT_CONFIG, guildModes: { vault: "vault", open: "open" } },

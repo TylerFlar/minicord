@@ -1,4 +1,4 @@
-import { modeOf } from "./commitment.ts";
+import { isEventChannel, modeOf } from "./commitment.ts";
 import { startOfLocalDay } from "./time.ts";
 import type { Pass, PassKind, PassWait, RulesState } from "./types.ts";
 
@@ -146,7 +146,7 @@ export function expirePasses(state: RulesState, now: number): RulesState {
   };
 }
 
-/** Can the user see this channel right now? Threads are covered by a pass on their parent. */
+/** Can the user see this channel right now? Threads are covered by a pass (or event channel) on their parent. */
 export function canViewChannel(
   state: RulesState,
   guildId: string,
@@ -155,5 +155,6 @@ export function canViewChannel(
   parentId?: string | null,
 ): boolean {
   if (modeOf(state.config, guildId) === "open") return true;
+  if (isEventChannel(state.config, channelId, parentId)) return true;
   return !!activePass(state, channelId, now) || (!!parentId && !!activePass(state, parentId, now));
 }

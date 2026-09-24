@@ -29,7 +29,7 @@ import type { MinicordClient } from "../app/client.ts";
 import { useClient, useSignals } from "../app/context.tsx";
 import { parseEmojiText, pointFrom, type MenuEntry, type PickedEmoji } from "../app/overlay.ts";
 import { emojiUrl, stickerUrl } from "../lib/cdn.ts";
-import { DEFAULT_REACTIONS, emojiName, useEmojiData } from "../lib/emoji.ts";
+import { DEFAULT_REACTIONS, emojiName, replaceShortcodes, useEmojiData } from "../lib/emoji.ts";
 import { formatBytes, formatClock, formatFull, formatRelative, formatSpan, formatTime } from "../lib/format.ts";
 import { messagePreview } from "../lib/preview.ts";
 import { isTouch, useLongPress } from "../lib/responsive.ts";
@@ -886,6 +886,9 @@ function StillImage({ src, alt, className, style, onOpen }: { src: string; alt: 
 
 function EmbedView({ embed: e }: { embed: Embed }) {
   const client = useClient();
+  // Bots write emoji as :shortcodes:, which Discord shows as emoji.
+  const emoji = useEmojiData();
+  const text = (t: string) => (emoji ? replaceShortcodes(emoji, t) : t);
   const view = (url: string) => client.openOverlay({ kind: "media", url, media: "image", original: url });
 
   if (e.type === "image" && (e.thumbnail || e.image)) {
@@ -924,12 +927,12 @@ function EmbedView({ embed: e }: { embed: Embed }) {
             disabled={!e.url}
             onClick={() => e.url && client.openLink(e.url)}
           >
-            {e.title}
+            <Markdown content={text(e.title)} inline />
           </button>
         )}
         {e.description && (
           <div className="mt-1 whitespace-pre-wrap break-words text-[14px] text-text/90">
-            <Markdown content={e.description.length > 700 ? `${e.description.slice(0, 700)}…` : e.description} inline />
+            <Markdown content={text(e.description.length > 700 ? `${e.description.slice(0, 700)}…` : e.description)} inline />
           </div>
         )}
         {e.fields?.length ? (
@@ -937,10 +940,10 @@ function EmbedView({ embed: e }: { embed: Embed }) {
             {e.fields.map((f, i) => (
               <div key={i} className={f.inline ? "" : "col-span-3"}>
                 <div className="text-[13px] font-semibold">
-                  <Markdown content={f.name} inline />
+                  <Markdown content={text(f.name)} inline />
                 </div>
                 <div className="whitespace-pre-wrap text-[13.5px] text-text/90">
-                  <Markdown content={f.value} inline />
+                  <Markdown content={text(f.value)} inline />
                 </div>
               </div>
             ))}

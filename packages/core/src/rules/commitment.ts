@@ -8,6 +8,11 @@ export function isSorted(config: RulesConfig, guildId: string): boolean {
   return guildId in config.guildModes;
 }
 
+/** Event channels (and threads in them) stay readable in a vaulted server. */
+export function isEventChannel(config: RulesConfig, channelId: string, parentId?: string | null): boolean {
+  return channelId in config.eventChannels || (!!parentId && parentId in config.eventChannels);
+}
+
 /**
  * Loosening changes are delayed by the cooldown; tightening applies instantly.
  * Sorting a server for the first time counts as an initial decision, not loosening.
@@ -18,6 +23,9 @@ export function isLoosening(config: RulesConfig, change: Change): boolean {
       return isSorted(config, change.guildId) && modeOf(config, change.guildId) === "vault" && change.mode === "open";
     case "defaultMode":
       return config.defaultMode === "vault" && change.mode === "open";
+    case "eventChannel":
+      // Opening a channel of a vaulted server loosens the vault; in an open server it only feeds the agenda.
+      return change.on && !(change.channelId in config.eventChannels) && modeOf(config, change.guildId) === "vault";
     case "passMinutes":
       return change.value > config.passMinutes;
     case "passExtensionMinutes":
@@ -41,6 +49,12 @@ export function applyChange(config: RulesConfig, change: Change): RulesConfig {
       return { ...config, guildModes: { ...config.guildModes, [change.guildId]: change.mode } };
     case "defaultMode":
       return { ...config, defaultMode: change.mode };
+    case "eventChannel": {
+      const eventChannels = { ...config.eventChannels };
+      if (change.on) eventChannels[change.channelId] = change.guildId;
+      else delete eventChannels[change.channelId];
+      return { ...config, eventChannels };
+    }
     case "passMinutes":
       return { ...config, passMinutes: change.value };
     case "passExtensionMinutes":
@@ -61,6 +75,7 @@ export function applyChange(config: RulesConfig, change: Change): RulesConfig {
 function sameTarget(a: Change, b: Change): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "guildMode" && b.kind === "guildMode") return a.guildId === b.guildId;
+  if (a.kind === "eventChannel" && b.kind === "eventChannel") return a.channelId === b.channelId;
   return a.kind !== "settings";
 }
 
@@ -98,4 +113,12 @@ export function applyDue(state: RulesState, now: number): RulesState {
 
 export function pendingFor(state: RulesState, guildId: string): PendingChange | undefined {
   return state.pending.find((p) => p.change.kind === "guildMode" && p.change.guildId === guildId);
+}
+
+/** Event channels waiting out the cooldown before they open. */
+export function pendingEventChannels(state: RulesState, guildId?: string): (PendingChange & { change: Extract<Change, { kind: "eventChannel" }> })[] {
+  return state.pending.filter(
+    (p): p is PendingChange & { change: Extract<Change, { kind: "eventChannel" }> } =>
+      p.change.kind === "eventChannel" && p.change.on && (!guildId || p.change.guildId === guildId),
+  );
 }

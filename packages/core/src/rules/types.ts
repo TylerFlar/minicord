@@ -11,6 +11,11 @@ export interface RulesConfig {
   /** Mode for servers you haven't sorted yet (e.g. newly joined). */
   defaultMode: GuildMode;
   guildModes: Record<string, GuildMode>;
+  /**
+   * Channels where a server posts its events (Sesh cards, calendar bots, announcements): readable
+   * even when the server is vaulted, and their dated posts join the Events agenda. channelId → guildId.
+   */
+  eventChannels: Record<string, string>;
   passMinutes: number;
   passExtensionMinutes: number;
   manualPassesPerDay: number;
@@ -33,6 +38,7 @@ export interface RulesConfig {
 export type Change =
   | { kind: "guildMode"; guildId: string; mode: GuildMode }
   | { kind: "defaultMode"; mode: GuildMode }
+  | { kind: "eventChannel"; guildId: string; channelId: string; on: boolean }
   | { kind: "passMinutes"; value: number }
   | { kind: "passExtensionMinutes"; value: number }
   | { kind: "manualPassesPerDay"; value: number }
@@ -93,6 +99,7 @@ export interface RulesState {
 export const DEFAULT_CONFIG: RulesConfig = {
   defaultMode: "vault",
   guildModes: {},
+  eventChannels: {},
   passMinutes: 10,
   passExtensionMinutes: 5,
   manualPassesPerDay: 3,

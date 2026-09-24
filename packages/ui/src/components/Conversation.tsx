@@ -1,5 +1,5 @@
-import { ChannelType, type Message } from "@minicord/core";
-import { ArrowLeft, ChevronRight, Hash, Megaphone, MessagesSquare, Phone, Pin, Search, Upload, Users } from "lucide-react";
+import { ChannelType, rules as R, type Message } from "@minicord/core";
+import { ArrowLeft, CalendarDays, ChevronRight, Hash, Megaphone, MessagesSquare, Phone, Pin, Search, Upload, Users } from "lucide-react";
 import { effectiveStatus } from "../lib/presence.ts";
 import { useIsMobile, useLocalFlag } from "../lib/responsive.ts";
 import { MemberList } from "./MemberList.tsx";
@@ -47,8 +47,12 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
   const typing = store.typingIn(channelId).filter((u) => u.id !== store.me?.id);
   const blocked = !access.allowed ? "Vaulted. Open a pass from the vault to reply." : !store.canSend(channel) ? "You can't send messages here." : undefined;
   const threads = !isDm && !isGroup && !isThread && channel.type !== ChannelType.GuildVoice;
-  // Member lists belong to open servers and group DMs; a pass is for one conversation.
-  const memberList = (isGroup || (!!channel.guild_id && !isThread)) && access.allowed && !access.pass;
+  // In a vaulted server you only ever see one channel (a pass, or an event channel): no member list,
+  // search stays in the channel, and history is capped.
+  const vaulted = !!channel.guild_id && R.modeOf(client.rules.config, channel.guild_id) === "vault";
+  const memberList = (isGroup || (!!channel.guild_id && !isThread && !vaulted)) && access.allowed;
+  const eventable = !!channel.guild_id && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement) && access.allowed;
+  const eventChannel = client.isEventChannel(channel);
   const toggleMembers = () => (mobile ? client.openOverlay({ kind: "members", channelId }) : setMembersShown(!membersShown));
   const dmPresence = isDm && recipients[0] ? store.presenceOf(recipients[0].id) : undefined;
 
@@ -118,6 +122,15 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
               <Pin size={18} />
             </IconButton>
           )}
+          {eventable && (
+            <IconButton
+              label={eventChannel ? "Event channel (on)" : "Event channel"}
+              onClick={() => client.setEventChannel(channel, !eventChannel)}
+              className={`h-8 w-8 ${eventChannel ? "text-accent" : ""}`}
+            >
+              <CalendarDays size={18} />
+            </IconButton>
+          )}
           {memberList && (
             <IconButton
               label={membersShown && !mobile ? "Hide member list" : "Member list"}
@@ -132,7 +145,7 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
               label="Search"
               onClick={() =>
                 // A pass only covers its channel, so search stays inside it; open servers search the whole server.
-                client.openOverlay({ kind: "search", channelId, ...(channel.guild_id && !access.pass ? { guildId: channel.guild_id } : {}) })
+                client.openOverlay({ kind: "search", channelId, ...(channel.guild_id && !vaulted ? { guildId: channel.guild_id } : {}) })
               }
               className="h-8 w-8"
             >
@@ -149,7 +162,7 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
               channelId={channelId}
               {...(anchor ? { anchor } : {})}
               canWrite={canWrite}
-              {...(access.pass ? { maxOlderPages: 2 } : {})}
+              {...(vaulted ? { maxOlderPages: 2 } : {})}
               onReply={setReplyTo}
             />
           ) : (

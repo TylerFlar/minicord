@@ -12,11 +12,15 @@ export function eventEnd(e: ScheduledEvent): number {
 
 const VIRTUAL_VENUE = /\b(vrchat|online|virtual|zoom|discord|twitch|youtube|google meet|microsoft teams|livestream|stream|minecraft|roblox|steam)\b/i;
 
+/** A place you'd go to, rather than a link or a virtual venue. */
+export function isPhysicalLocation(location: string | undefined): boolean {
+  const text = location?.trim() ?? "";
+  return text.length > 0 && !/^https?:\/\//i.test(text) && !VIRTUAL_VENUE.test(text);
+}
+
 /** External events whose location is a place (not a link or a virtual venue) are treated as in person. */
 export function isInPerson(e: ScheduledEvent): boolean {
-  if (e.entity_type !== ScheduledEventEntityType.External) return false;
-  const location = e.entity_metadata?.location?.trim() ?? "";
-  return location.length > 0 && !/^https?:\/\//i.test(location) && !VIRTUAL_VENUE.test(location);
+  return e.entity_type === ScheduledEventEntityType.External && isPhysicalLocation(e.entity_metadata?.location);
 }
 
 export function isUpcomingOrLive(e: ScheduledEvent, now: number): boolean {
@@ -28,22 +32,45 @@ export function eventUrl(e: ScheduledEvent): string {
   return `https://discord.com/events/${e.guild_id}/${e.id}`;
 }
 
+/** What a calendar needs to know about an event, whether it's a Discord event or posted in a channel. */
+export interface CalendarEntry {
+  uid: string;
+  title: string;
+  description?: string;
+  start: number;
+  end: number;
+  location?: string;
+  url: string;
+}
+
+function asEntry(e: ScheduledEvent | CalendarEntry): CalendarEntry {
+  if (!("scheduled_start_time" in e)) return e;
+  const location = e.entity_metadata?.location;
+  return {
+    uid: `${e.id}@discord-events.minicord`,
+    title: e.name,
+    ...(e.description ? { description: e.description } : {}),
+    start: eventStart(e),
+    end: eventEnd(e),
+    ...(location ? { location } : {}),
+    url: eventUrl(e),
+  };
+}
+
 function calStamp(ms: number): string {
   return new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-export function googleCalendarUrl(e: ScheduledEvent, guildName?: string): string {
-  const details = [e.description ?? "", guildName ? `From ${guildName} on Discord` : "", eventUrl(e)]
-    .filter(Boolean)
-    .join("\n\n");
+export function googleCalendarUrl(event: ScheduledEvent | CalendarEntry, guildName?: string): string {
+  const e = asEntry(event);
+  const details = [e.description ?? "", guildName ? `From ${guildName} on Discord` : "", e.url].filter(Boolean).join("\n\n");
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: e.name,
-    dates: `${calStamp(eventStart(e))}/${calStamp(eventEnd(e))}`,
+    text: e.title,
+    dates: `${calStamp(e.start)}/${calStamp(e.end)}`,
     details,
   });
-  const location = e.entity_metadata?.location;
-  if (location) params.set("location", location);
+  if (e.location) params.set("location", e.location);
   return `https://calendar.google.com/calendar/render?${params}`;
 }
 
@@ -52,22 +79,22 @@ function icsEscape(text: string): string {
 }
 
 /** A single-event iCalendar file (RFC 5545), for any calendar app. */
-export function toICS(e: ScheduledEvent, guildName?: string, now = Date.now()): string {
+export function toICS(event: ScheduledEvent | CalendarEntry, guildName?: string, now = Date.now()): string {
+  const e = asEntry(event);
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//minicord//events//EN",
     "BEGIN:VEVENT",
-    `UID:${e.id}@discord-events.minicord`,
+    `UID:${e.uid}`,
     `DTSTAMP:${calStamp(now)}`,
-    `DTSTART:${calStamp(eventStart(e))}`,
-    `DTEND:${calStamp(eventEnd(e))}`,
-    `SUMMARY:${icsEscape(e.name)}`,
+    `DTSTART:${calStamp(e.start)}`,
+    `DTEND:${calStamp(e.end)}`,
+    `SUMMARY:${icsEscape(e.title)}`,
     `DESCRIPTION:${icsEscape([e.description ?? "", guildName ? `From ${guildName} on Discord` : ""].filter(Boolean).join("\n\n"))}`,
-    `URL:${eventUrl(e)}`,
+    `URL:${e.url}`,
   ];
-  const location = e.entity_metadata?.location;
-  if (location) lines.push(`LOCATION:${icsEscape(location)}`);
+  if (e.location) lines.push(`LOCATION:${icsEscape(e.location)}`);
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n") + "\r\n";
 }
@@ -75,8 +102,12 @@ export function toICS(e: ScheduledEvent, guildName?: string, now = Date.now()): 
 export type AgendaBucket = "live" | "today" | "tomorrow" | "this-week" | "later";
 
 export function agendaBucket(e: ScheduledEvent, now: number): AgendaBucket {
-  const start = eventStart(e);
-  if (e.status === ScheduledEventStatus.Active || (start <= now && eventEnd(e) > now)) return "live";
+  return agendaBucketAt(eventStart(e), eventEnd(e), now, e.status === ScheduledEventStatus.Active);
+}
+
+/** Agenda bucket for anything with a start and an end. */
+export function agendaBucketAt(start: number, end: number, now: number, live = false): AgendaBucket {
+  if (live || (start <= now && end > now)) return "live";
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   const day = 86_400_000;

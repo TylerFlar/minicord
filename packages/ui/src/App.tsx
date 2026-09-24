@@ -90,6 +90,7 @@ export function App() {
     return (
       <div className="h-full" style={safeTop}>
         <OnboardingScreen />
+        <Toasts />
       </div>
     );
 

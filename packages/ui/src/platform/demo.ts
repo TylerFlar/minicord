@@ -144,7 +144,13 @@ const G = {
     members: 48210,
     channels: [text(sid(501), sid(500), "general", 0), text(sid(502), sid(500), "events", 1), text(sid(503), sid(500), "food", 2), text(sid(504), sid(500), "memes", 3)],
   },
-  neighbors: { id: sid(600), name: "Neighborhood", icon: glyph("🏡", "#f2e6d0"), members: 311, channels: [text(sid(601), sid(600), "announcements", 0), text(sid(602), sid(600), "lost-and-found", 1)] },
+  neighbors: {
+    id: sid(600),
+    name: "Neighborhood",
+    icon: glyph("🏡", "#f2e6d0"),
+    members: 311,
+    channels: [text(sid(601), sid(600), "announcements", 0, undefined, "Block parties, meetings and other happenings"), text(sid(602), sid(600), "lost-and-found", 1)],
+  },
 } satisfies Record<string, DemoGuild>;
 
 // ---- messages -------------------------------------------------------------------
@@ -241,6 +247,40 @@ const mentions: Message[] = [
   say(sid(602), P.lena, 300, `<@${me.id}> is this your bike? It's been by the park gate all week`, { mentions: [me] }),
 ];
 messages[sid(502)] = messages[sid(502)]!.filter((m) => m.id !== oldQuestion.id).concat(oldQuestion).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+
+// Events posted in channels instead of as Discord events: a bot's card and its listing, and a plain announcement.
+const planner: User = { ...person(sid(109), "planner", "Planner", "📅", "#e6e1f5"), bot: true };
+const unix = (iso: string) => Math.floor(Date.parse(iso) / 1000);
+const cleanup = unix(nextDay(6, 9));
+const cleanupCard = say(sid(502), planner, 40, "", {
+  embeds: [
+    {
+      title: ":calendar_spiral:  **Beach cleanup**",
+      description: "Gloves and bags provided. Tacos after for everyone who helps.",
+      fields: [
+        { name: "Time", value: `<t:${cleanup}:F> (<t:${cleanup}:R>)` },
+        { name: "Duration", value: "2 hours" },
+        { name: "Location", value: "Ocean Beach pier" },
+        { name: "Attendees (14)", value: ">>> Noor\nKai\nLena", inline: true },
+      ],
+    },
+  ],
+});
+const trivia = unix(nextDay(3, 19, 30));
+say(sid(502), planner, 20, "", {
+  embeds: [
+    {
+      title: "📃 Event Listings",
+      fields: [
+        { name: "Saturday", value: `> **[Beach cleanup](https://discord.com/channels/${sid(500)}/${sid(502)}/${cleanupCard.id})** <t:${cleanup}:R>` },
+        { name: "Wednesday", value: `> **[Trivia at the taproom](https://discord.com/channels/${sid(500)}/${sid(502)}/${sid(9999)})** <t:${trivia}:R>` },
+      ],
+    },
+  ],
+});
+const party = unix(nextDay(0, 16));
+say(sid(601), P.theo, 180, `**Block party** on Maple St <t:${party}:F> - <t:${party + 4 * 3600}:t>
+Bring a dish to share. The street closes to cars from 3.`);
 
 // ---- events -----------------------------------------------------------------------
 
@@ -387,6 +427,7 @@ export function demoPlatform(): Platform {
         config: {
           ...R.DEFAULT_CONFIG,
           guildModes: { [G.trail.id]: "open", [G.photo.id]: "open", [G.books.id]: "open", [G.games.id]: "open", [G.city.id]: "vault", [G.neighbors.id]: "vault" },
+          eventChannels: { [sid(502)]: G.city.id },
         },
       },
     ],

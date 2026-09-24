@@ -29,10 +29,10 @@
 
 Discord is where your friends are. It's also where the endless scroll is. minicord keeps the first and puts friction in front of the second.
 
-- **Vault the servers you doomscroll.** A vaulted server has no channel list. Mentions, replies and events still reach you; everything else stays behind the lock.
+- **Vault the servers you doomscroll.** A vaulted server has no channel list. Mentions, replies and events still reach you, and so do the channels where it posts events; everything else stays behind the lock.
 - **Passes, not willpower.** Replying to a mention opens that one channel for 10 minutes. Opening a channel yourself means waiting a minute first (the wait doubles each time that day), and then it asks whether you still want in.
 - **An inbox, not a feed.** The app opens on what's actually for you: unread DMs, mentions and this week's events.
-- **Plans float up.** Events from every server, vaulted ones included, in one agenda with RSVP and calendar export.
+- **Plans float up.** Events from every server, vaulted ones included, in one agenda with RSVP and calendar export. Events servers post in channels (Sesh cards, calendar bots, announcements with a Discord timestamp) land there too.
 - **Loosening waits a day.** Vaulting a server is instant. Unvaulting it, or making passes easier, takes effect 24 hours later.
 
 ## Features

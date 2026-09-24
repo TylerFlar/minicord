@@ -40,8 +40,9 @@
   color-scheme: light;
 }
 
+/* Dark follows the system unless a theme is picked in Settings (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --mc-bg: #1b1b1d;
     --mc-surface: #232326;
     --mc-sunken: #18181a;
@@ -60,6 +61,26 @@
     --mc-idle: #dca84a;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --mc-bg: #1b1b1d;
+  --mc-surface: #232326;
+  --mc-sunken: #18181a;
+  --mc-text: #e6e4e0;
+  --mc-muted: #9b978f;
+  --mc-faint: #6b6862;
+  --mc-line: #323135;
+  --mc-accent: #74b3a5;
+  --mc-accent-soft: #23322e;
+  --mc-on-accent: #0e1916;
+  --mc-warn: #d8a35a;
+  --mc-warn-soft: #362d21;
+  --mc-danger: #e0866f;
+  --mc-highlight: #342d20;
+  --mc-online: #4fb685;
+  --mc-idle: #dca84a;
+  color-scheme: dark;
 }
 
 /* Element defaults live in the base layer so Tailwind utilities can override them. */

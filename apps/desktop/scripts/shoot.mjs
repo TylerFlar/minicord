@@ -118,7 +118,7 @@ async function conversationExtras() {
 
 async function tour() {
   const labels = await win.locator("nav button[aria-label]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
-  const fixed = new Set(["Inbox", "Direct Messages", "Events", "Done for now"]);
+  const fixed = new Set(["Inbox", "Direct Messages", "Events"]);
   const openGuild = labels.find((l) => !fixed.has(l) && !l.endsWith("(vaulted)") && !l.startsWith("Settings"));
   const vaultGuild = labels.find((l) => l.endsWith("(vaulted)"));
 

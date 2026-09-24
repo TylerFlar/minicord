@@ -20,6 +20,7 @@ export const Ipc = {
   shellOpenDiscord: "shell:open-discord",
   shellBadge: "shell:badge",
   shellHide: "shell:hide",
+  shellTheme: "shell:theme",
   appInfo: "app:info",
   updateCheck: "update:check",
   updateInstall: "update:install",

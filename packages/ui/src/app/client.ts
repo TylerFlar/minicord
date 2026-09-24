@@ -11,6 +11,7 @@ import {
   GatewayOp,
   isUpcomingOrLive,
   makeNonce,
+  Permission,
   postedEvents,
   rules as R,
   snowflakeToMs,
@@ -28,7 +29,9 @@ import {
   type GatewayStatus,
   type Mention,
   type MentionKind,
+  type Guild,
   type Message,
+  type NewEventInput,
   type Platform,
   type PostedEvent,
   type ScheduledEvent,
@@ -1382,6 +1385,24 @@ export class MinicordClient {
     }
   }
 
+  /** Servers where you may create events. */
+  eventGuilds(): Guild[] {
+    return this.store
+      .sortedGuilds()
+      .filter((g) => this.store.canInGuild(g.id, Permission.CreateEvents) || this.store.canInGuild(g.id, Permission.ManageEvents));
+  }
+
+  async createEvent(guildId: string, input: NewEventInput): Promise<boolean> {
+    try {
+      this.store.upsertEvents([await this.api.createScheduledEvent(guildId, input)]);
+      this.toast("Event created.", "info");
+      return true;
+    } catch (err) {
+      this.#reportError(err, "Couldn't create the event");
+      return false;
+    }
+  }
+
   async setInterested(event: ScheduledEvent, interested: boolean): Promise<void> {
     if (interested) this.store.myRsvps.add(event.id);
     else this.store.myRsvps.delete(event.id);
@@ -1552,16 +1573,4 @@ export class MinicordClient {
     console.warn(prefix, err);
   }
 
-  /** "Done for now": mark visible stuff read and get out of the way. */
-  done(): void {
-    for (const c of this.store.unreadDms()) {
-      if (c.last_message_id) {
-        this.store.markRead(c.id, c.last_message_id);
-        this.api.ack(c.id, c.last_message_id).catch(() => {});
-      }
-    }
-    this.#updateBadge();
-    this.navigate({ view: "inbox" });
-    this.platform.shell.hide();
-  }
 }

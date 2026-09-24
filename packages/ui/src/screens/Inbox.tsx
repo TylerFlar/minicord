@@ -46,9 +46,6 @@ export function InboxScreen() {
                 <AgendaCard item={nextInPerson} compact />
               </div>
             )}
-            <Button className="mt-5" onClick={() => client.done()}>
-              Done for now
-            </Button>
           </div>
         )}
 

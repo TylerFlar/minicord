@@ -6,6 +6,7 @@ export type Route =
   | { view: "server"; guildId: string; channelId?: string; anchor?: string; list?: boolean }
   | { view: "vault"; guildId: string }
   | { view: "servers" }
-  | { view: "events" }
+  /** `guildId` narrows the agenda to one server. */
+  | { view: "events"; guildId?: string }
   | { view: "settings" }
   | { view: "onboarding" };

@@ -61,6 +61,14 @@ export interface ThreadMetadata {
   locked?: boolean;
 }
 
+/** The current user's membership of a thread (present when joined). */
+export interface ThreadMember {
+  join_timestamp?: string;
+  flags?: number;
+  muted?: boolean;
+  mute_config?: { end_time: string | null } | null;
+}
+
 export interface Channel {
   id: Snowflake;
   type: number;
@@ -81,6 +89,8 @@ export interface Channel {
   flags?: number;
   rate_limit_per_user?: number;
   thread_metadata?: ThreadMetadata;
+  /** Threads only: set when the current user has joined. */
+  member?: ThreadMember;
   member_count?: number;
   message_count?: number;
   applied_tags?: Snowflake[];

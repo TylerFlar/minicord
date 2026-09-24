@@ -5,8 +5,12 @@ import { App } from "./App.tsx";
 import { MinicordClient } from "./app/client.ts";
 import { ClientProvider } from "./app/context.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
+import { applyTheme, savedTheme } from "./lib/theme.ts";
 import { electronPlatform } from "./platform/electron.ts";
 import "./styles.css";
+
+// Before anything paints, so a chosen theme never flashes the other one.
+applyTheme(savedTheme());
 
 declare global {
   interface Window {
@@ -38,6 +42,7 @@ if (!platform) {
   );
 } else {
   const client = new MinicordClient(platform);
+  platform.shell.setTheme?.(savedTheme());
   // Handy from DevTools and used by the automated UI tours.
   (window as unknown as { __minicord: MinicordClient }).__minicord = client;
   void client.start();

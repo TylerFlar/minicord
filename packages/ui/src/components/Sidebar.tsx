@@ -1,5 +1,5 @@
 import { isUpcomingOrLive, RelationshipType, rules as R, type Guild } from "@minicord/core";
-import { BellOff, CalendarDays, Check, CheckCheck, DoorOpen, ExternalLink, Inbox, Lock, MessageCircle, Settings } from "lucide-react";
+import { BellOff, CalendarDays, CheckCheck, DoorOpen, ExternalLink, Inbox, Lock, MessageCircle, Settings } from "lucide-react";
 import { useState, type MouseEvent, type ReactNode } from "react";
 import type { MinicordClient, OwnStatus } from "../app/client.ts";
 import { useClient, useNow, useSignals, useStore } from "../app/context.tsx";
@@ -215,9 +215,6 @@ export function Rail() {
       {vault.length > 0 && <div className="h-0.5 w-8 shrink-0 rounded-full bg-line" />}
       {vault.map((g) => guildItem(g, true))}
       <div className="mt-auto flex w-full flex-col items-center gap-2 pt-2">
-        <RailItem label="Done for now" active={false} onClick={() => client.done()} onTip={setTip}>
-          <Check size={22} />
-        </RailItem>
         <RailItem
           tone="guild"
           label={offline ? `You · ${client.status}` : `You · ${STATUS_LABEL[client.ownStatus()]}`}
@@ -293,17 +290,5 @@ export function GuildList() {
       {vault.length > 0 && <div className={heading}>Vault</div>}
       {vault.map((g) => row(g, true))}
     </>
-  );
-}
-
-export function DoneButton({ className = "" }: { className?: string }) {
-  const client = useClient();
-  return (
-    <button
-      onClick={() => client.done()}
-      className={`flex items-center justify-center gap-2 rounded-lg border border-line bg-surface py-2 text-[14px] font-medium text-muted hover:bg-sunken hover:text-text ${className}`}
-    >
-      <Check size={16} /> Done for now
-    </button>
   );
 }

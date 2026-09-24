@@ -1,15 +1,17 @@
 import { ChannelType, rules as R, type Channel, type VoiceState } from "@minicord/core";
-import { ArrowLeft, BellOff, CheckCheck, ChevronDown, ExternalLink, Hash, HeadphoneOff, Link2, Megaphone, MessagesSquare, MicOff, Video, Volume2 } from "lucide-react";
+import { ArrowLeft, BellOff, CalendarDays, CheckCheck, ChevronDown, ExternalLink, Hash, HeadphoneOff, Link2, Megaphone, MessagesSquare, MicOff, Video, Volume2 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Conversation } from "../components/Conversation.tsx";
 import { ForumView } from "../components/Forum.tsx";
 import { Avatar } from "../components/Avatar.tsx";
 import { guildMenu } from "../components/Sidebar.tsx";
+import { usePostedEvents } from "../components/PostedEventCard.tsx";
 import { Empty, IconButton } from "../components/ui.tsx";
 import type { MinicordClient } from "../app/client.ts";
-import { useClient, useSignals, useStore } from "../app/context.tsx";
+import { useClient, useNow, useSignals, useStore } from "../app/context.tsx";
 import type { MenuEntry } from "../app/overlay.ts";
 import { useIsMobile } from "../lib/responsive.ts";
+import { agendaItems } from "./Events.tsx";
 
 const VOICE = new Set<number>([ChannelType.GuildVoice, ChannelType.GuildStageVoice]);
 const FORUM = new Set<number>([ChannelType.GuildForum, ChannelType.GuildMedia]);
@@ -56,9 +58,16 @@ function VoiceMembers({ states, guildId }: { states: VoiceState[]; guildId: stri
 
 function ChannelSidebar({ guildId, selectedId, mobile }: { guildId: string; selectedId: string | undefined; mobile: boolean }) {
   const client = useSignals(["rules", "collapsed"]);
-  const store = useStore(["guilds", `channels:${guildId}`, `guild:${guildId}`, "readstates", "settings", "voice", "members", "channels"]);
+  const store = useStore(["guilds", `channels:${guildId}`, `guild:${guildId}`, "readstates", "settings", "voice", "members", "channels", "events"]);
+  const posted = usePostedEvents();
+  const now = useNow(60_000);
   const guild = store.guilds.get(guildId)!;
   const groups = store.guildChannelGroups(guildId);
+  const eventCount = agendaItems(
+    [...store.events.values()].filter((e) => e.guild_id === guildId),
+    posted.filter((e) => e.guildId === guildId),
+    now,
+  ).length;
 
   const open = (c: Channel) => {
     if (VOICE.has(c.type)) client.joinCall(c.id);
@@ -71,7 +80,7 @@ function ChannelSidebar({ guildId, selectedId, mobile }: { guildId: string; sele
 
   const row = (c: Channel, depth = 0) => {
     const selected = c.id === selectedId;
-    const muted = store.mutedByDiscord(c);
+    const muted = store.mutedByDiscord(c) || !!c.member?.muted;
     const unread = !VOICE.has(c.type) && !muted && store.isUnread(c.id);
     const mentions = store.mentionCount(c.id);
     return (
@@ -118,6 +127,14 @@ function ChannelSidebar({ guildId, selectedId, mobile }: { guildId: string; sele
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-3 pt-2">
+        <button
+          onClick={() => client.navigate({ view: "events", guildId })}
+          className="mb-2 flex w-full items-center gap-1.5 rounded-md py-[5px] pl-2 pr-2 text-left text-[15px] text-muted hover:bg-sunken/70 hover:text-text"
+        >
+          <CalendarDays size={18} className="shrink-0 opacity-70" />
+          <span className="flex-1">Events</span>
+          {eventCount > 0 && <span className="text-[12.5px] tabular-nums">{eventCount}</span>}
+        </button>
         {groups.map((group) => {
           const category = group.category;
           const collapsed = !!category && client.isCollapsed(guildId, category.id);
@@ -144,7 +161,8 @@ function ChannelSidebar({ guildId, selectedId, mobile }: { guildId: string; sele
               )}
               {channels.map((c) => {
                 const voice = VOICE.has(c.type) ? store.voiceIn(c.id) : [];
-                const threads = VOICE.has(c.type) || collapsed ? [] : store.threadsOf(c.id).filter((t) => t.id === selectedId || store.readStates.has(t.id)).slice(0, 5);
+                // Like Discord: the active threads you've joined, plus the one you're in.
+                const threads = VOICE.has(c.type) || collapsed ? [] : store.threadsOf(c.id).filter((t) => t.id === selectedId || !!t.member);
                 return (
                   <div key={c.id}>
                     {row(c)}

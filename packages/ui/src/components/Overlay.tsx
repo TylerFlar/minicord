@@ -9,6 +9,7 @@ import { BotModal } from "./BotModal.tsx";
 import { EmojiPicker } from "./EmojiPicker.tsx";
 import { ExpressionPicker } from "./ExpressionPicker.tsx";
 import { MemberList } from "./MemberList.tsx";
+import { NewEventForm } from "./NewEvent.tsx";
 import { ForwardPicker, PinsPanel, ProfileCard, QuickSwitcher, SearchPanel, ThreadsPanel } from "./Panels.tsx";
 import { Button } from "./ui.tsx";
 
@@ -309,5 +310,7 @@ export function OverlayHost() {
       );
     case "confirm":
       return <Confirm {...overlay} />;
+    case "newEvent":
+      return <NewEventForm {...(overlay.guildId ? { guildId: overlay.guildId } : {})} />;
   }
 }

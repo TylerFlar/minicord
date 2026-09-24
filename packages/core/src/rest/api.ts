@@ -38,6 +38,8 @@ export interface GifCategory {
   src: string;
 }
 
+export type NewEventInput = { name: string; description?: string; start: number; end?: number } & ({ location: string } | { channelId: string });
+
 export interface ForumPostInput {
   name: string;
   content: string;
@@ -195,6 +197,24 @@ export class DiscordApi {
   /** Events the current user marked Interested in the given guild. */
   myScheduledEvents(guildId: string): Promise<{ guild_scheduled_event_id: string; user_id: string }[]> {
     return this.#get(`/users/@me/scheduled-events`, { guild_ids: guildId });
+  }
+
+  /** Somewhere else (a location), or one of the server's voice channels. */
+  createScheduledEvent(guildId: string, input: NewEventInput): Promise<ScheduledEvent> {
+    const where =
+      "location" in input
+        ? { entity_type: 3, channel_id: null, entity_metadata: { location: input.location } }
+        : { entity_type: 2, channel_id: input.channelId, entity_metadata: null };
+    return this.#request<ScheduledEvent>("POST", `/guilds/${guildId}/scheduled-events`, {
+      json: {
+        name: input.name,
+        description: input.description || null,
+        privacy_level: 2,
+        scheduled_start_time: new Date(input.start).toISOString(),
+        scheduled_end_time: input.end ? new Date(input.end).toISOString() : null,
+        ...where,
+      },
+    });
   }
 
   setEventInterest(guildId: string, eventId: string, interested: boolean): Promise<unknown> {

@@ -10,12 +10,12 @@ import {
   type PostedEvent,
   type ScheduledEvent,
 } from "@minicord/core";
-import { CalendarDays, Hash } from "lucide-react";
+import { CalendarDays, Hash, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { EventCard } from "../components/EventCard.tsx";
 import { EventChannels } from "../components/EventChannels.tsx";
 import { PostedEventCard, usePostedEvents } from "../components/PostedEventCard.tsx";
-import { Card, Empty, SectionTitle } from "../components/ui.tsx";
+import { Button, Card, Empty, SectionTitle } from "../components/ui.tsx";
 import { useClient, useNow, useStore } from "../app/context.tsx";
 
 const BUCKETS: { key: AgendaBucket; label: string }[] = [
@@ -47,13 +47,14 @@ export function AgendaCard({ item, compact = false }: { item: AgendaItem; compac
   return item.kind === "discord" ? <EventCard event={item.event} compact={compact} /> : <PostedEventCard event={item.event} compact={compact} />;
 }
 
-export function EventsScreen() {
+export function EventsScreen({ guildId: initialGuild }: { guildId?: string }) {
   const client = useClient();
   const store = useStore(["events", "guilds"]);
   const posted = usePostedEvents();
   const now = useNow(60_000);
   const [filter, setFilter] = useState<Filter>("all");
-  const [guildId, setGuildId] = useState("");
+  const [guildId, setGuildId] = useState(initialGuild ?? "");
+  const canCreate = client.eventGuilds().length > 0;
   // Nothing chosen yet: open the suggestions on the first visit.
   const [managing, setManaging] = useState(
     () => Object.keys(client.rules.config.eventChannels).length === 0 && store.sortedGuilds().some((g) => client.eventChannelSuggestions(g.id, 1).length > 0),
@@ -74,12 +75,19 @@ export function EventsScreen() {
           : i.kind === "discord" && store.myRsvps.has(i.event.id))) &&
       (!guildId || i.guildId === guildId),
   );
-  const guildsWithEvents = [...new Set(all.map((i) => i.guildId))].map((id) => store.guilds.get(id)).filter((g) => !!g);
+  const guildsWithEvents = [...new Set([...all.map((i) => i.guildId), ...(guildId ? [guildId] : [])])].map((id) => store.guilds.get(id)).filter((g) => !!g);
 
   return (
     <div className="flex-1 overflow-y-auto bg-surface">
       <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
-        <h1 className="mb-4 text-[22px] font-bold">Events</h1>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h1 className="text-[22px] font-bold">Events</h1>
+          {canCreate && (
+            <Button size="sm" onClick={() => client.openOverlay({ kind: "newEvent", ...(guildId ? { guildId } : {}) })}>
+              <Plus size={15} /> New event
+            </Button>
+          )}
+        </div>
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {(["all", "in-person", "interested"] as const).map((f) => (
             <button
@@ -96,7 +104,7 @@ export function EventsScreen() {
           >
             <Hash size={13} /> Event channels
           </button>
-          {guildsWithEvents.length > 1 && (
+          {(guildsWithEvents.length > 1 || guildId) && (
             <select value={guildId} onChange={(e) => setGuildId(e.target.value)} className="ml-auto rounded-md bg-sunken px-2 py-1 text-[13.5px] outline-none">
               <option value="">All servers</option>
               {guildsWithEvents.map((g) => (

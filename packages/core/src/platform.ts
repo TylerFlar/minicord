@@ -81,6 +81,8 @@ export interface Platform {
     setBadge(count: number): void;
     /** "Done for now": get out of the way (hide to tray / background). */
     hide(): void;
+    /** Match native chrome (window, menus, system bars) to the chosen theme. */
+    setTheme?(theme: "system" | "light" | "dark"): void;
     onFocusChange(fn: (focused: boolean) => void): () => void;
     /** Hardware/gesture back (Android). The handler returns false when there's nowhere to go back to. */
     onBack?(fn: () => boolean): () => void;

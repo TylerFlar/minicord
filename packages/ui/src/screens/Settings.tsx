@@ -1,11 +1,12 @@
 import { rules as R } from "@minicord/core";
 import { Clock } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Avatar, GuildIcon } from "../components/Avatar.tsx";
 import { STATUS_LABEL } from "../lib/presence.ts";
 import { Button, Card, SectionTitle } from "../components/ui.tsx";
 import { useNow, useSignals, useStore } from "../app/context.tsx";
 import { formatDuration } from "../lib/format.ts";
+import { savedTheme, setTheme, type Theme } from "../lib/theme.ts";
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -224,6 +225,13 @@ export function SettingsScreen() {
           </Row>
         </Card>
 
+        <SectionTitle>Appearance</SectionTitle>
+        <Card>
+          <Row label="Theme">
+            <ThemeSelect />
+          </Row>
+        </Card>
+
         <SectionTitle>About</SectionTitle>
         <Card>
           <Row label={`minicord ${client.appVersion ?? ""}`.trim()} {...(updateHint ? { hint: updateHint } : {})}>
@@ -253,5 +261,24 @@ export function SettingsScreen() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function ThemeSelect() {
+  const client = useSignals([]);
+  const [theme, set] = useState<Theme>(savedTheme);
+  return (
+    <Select
+      value={theme}
+      options={[
+        { value: "system", label: "System" },
+        { value: "light", label: "Light" },
+        { value: "dark", label: "Dark" },
+      ]}
+      onChange={(t: Theme) => {
+        set(t);
+        setTheme(t, client.platform);
+      }}
+    />
   );
 }

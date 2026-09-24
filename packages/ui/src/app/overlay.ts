@@ -37,7 +37,8 @@ export type Overlay =
       onGif: (url: string) => void;
       onSticker: (sticker: { id: string; name: string; format_type: number }) => void;
     }
-  | { kind: "confirm"; title: string; body?: string; action: string; danger?: boolean; run: () => void };
+  | { kind: "confirm"; title: string; body?: string; action: string; danger?: boolean; run: () => void }
+  | { kind: "newEvent"; guildId?: string };
 
 /** Recent-emoji strings are either a unicode emoji or a <:name:id> token. */
 export function parseEmojiText(text: string): PickedEmoji {

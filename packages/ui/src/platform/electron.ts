@@ -57,6 +57,7 @@ export function electronPlatform(native: NativeBridge): Platform {
       openDiscord: (path) => native.send(Ipc.shellOpenDiscord, path),
       setBadge: (count) => native.send(Ipc.shellBadge, count),
       hide: () => native.send(Ipc.shellHide),
+      setTheme: (theme) => native.send(Ipc.shellTheme, theme),
       checkForUpdates: () => native.invoke(Ipc.updateCheck) as Promise<UpdateStatus>,
       onUpdateStatus: (fn) => native.on(Ipc.updateStatus, (s) => fn(s as UpdateStatus)),
       installUpdate: () => native.send(Ipc.updateInstall),

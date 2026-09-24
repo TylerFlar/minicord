@@ -41,7 +41,7 @@ function Screen({ route }: { route: Route }) {
     case "servers":
       return <ServersScreen />;
     case "events":
-      return <EventsScreen />;
+      return <EventsScreen key={route.guildId ?? ""} {...(route.guildId ? { guildId: route.guildId } : {})} />;
     case "settings":
       return <SettingsScreen />;
     case "onboarding":

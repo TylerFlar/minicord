@@ -5,6 +5,8 @@ export const Permission = {
   Administrator: 1n << 3n,
   AddReactions: 1n << 6n,
   ManageMessages: 1n << 13n,
+  ManageEvents: 1n << 33n,
+  CreateEvents: 1n << 44n,
   ViewChannel: 1n << 10n,
   SendMessages: 1n << 11n,
   EmbedLinks: 1n << 14n,

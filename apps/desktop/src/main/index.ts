@@ -215,6 +215,9 @@ function registerIpc(): void {
   on(Ipc.shellOpenDiscord, (_e, path: string) => openDiscord(path, icon));
   on(Ipc.shellBadge, (_e, count: number) => setBadge(count));
   on(Ipc.shellHide, () => win?.hide());
+  on(Ipc.shellTheme, (_e, theme: unknown) => {
+    if (theme === "system" || theme === "light" || theme === "dark") nativeTheme.themeSource = theme;
+  });
   handle(Ipc.appInfo, () => ({ version: app.getVersion() }));
   handle(Ipc.updateCheck, () => updates.check());
   on(Ipc.updateInstall, () => updates.install());

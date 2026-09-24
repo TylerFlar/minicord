@@ -1,5 +1,5 @@
 import { App } from "@capacitor/app";
-import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
+import { Capacitor, registerPlugin, SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacitor/core";
 import {
   DiscordApiError,
   type AppNotification,
@@ -104,6 +104,8 @@ export function capacitorPlatform(): Platform {
       openDiscord: (path) => void Native.openDiscord({ path }),
       setBadge: () => {},
       hide: () => void Native.hide(),
+      setTheme: (theme) =>
+        void SystemBars.setStyle({ style: theme === "dark" ? SystemBarsStyle.Dark : theme === "light" ? SystemBarsStyle.Light : SystemBarsStyle.Default }),
       onFocusChange: (fn) => later(App.addListener("appStateChange", ({ isActive }) => fn(isActive))),
       onBack: (fn) =>
         later(

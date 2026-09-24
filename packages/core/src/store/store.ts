@@ -1,5 +1,5 @@
 import { classifyMention, type MentionContext } from "../mentions.ts";
-import { channelPermissions, has, Permission } from "../permissions.ts";
+import { basePermissions, channelPermissions, has, Permission } from "../permissions.ts";
 import {
   ChannelType,
   RelationshipType,
@@ -19,7 +19,7 @@ import {
 } from "../types.ts";
 import { decodeUserSettings, type GuildFolder, type StatusSetting } from "../util/proto.ts";
 import { applyMemberListOps, memberListId, type MemberList, type MemberListOp } from "./member-list.ts";
-import { compareSnowflakes, isNewer } from "../util/snowflake.ts";
+import { compareSnowflakes, isNewer, snowflakeToMs } from "../util/snowflake.ts";
 import { channelReadStates, entriesOf, normalizeGuild, settingsKey, type RawGuild } from "./normalize.ts";
 
 export interface MessageList {
@@ -334,6 +334,19 @@ export class Store {
     this.relationships.set(raw.id, { ...raw, user_id: raw.user_id ?? raw.user?.id ?? raw.id });
   }
 
+  /** Joined (membership object) or left (null) a thread. */
+  #setThreadMember(threadId: string, member: AnyRecord | null): void {
+    const thread = this.channels.get(threadId);
+    if (!thread) return;
+    const { id: _id, user_id: _user, guild_id: _guild, member: _nested, presence: _presence, ...rest } = member ?? {};
+    const next = { ...thread };
+    if (member) next.member = rest;
+    else delete next.member;
+    this.channels.set(threadId, next);
+    if (thread.guild_id) this.touch(`channels:${thread.guild_id}`);
+    this.touch(`channel:${threadId}`, "channels");
+  }
+
   #upsertChannel(raw: Channel): void {
     if (isPrivate(raw)) {
       this.#addPrivateChannel(raw);
@@ -460,7 +473,20 @@ export class Store {
         break;
       case "THREAD_LIST_SYNC":
         for (const t of (d.threads ?? []) as Channel[]) this.#upsertChannel({ ...t, guild_id: d.guild_id });
+        for (const m of (d.members ?? []) as AnyRecord[]) if (!m.user_id || m.user_id === this.me?.id) this.#setThreadMember(m.id, m);
         break;
+      case "THREAD_MEMBER_UPDATE":
+        if (!d.user_id || d.user_id === this.me?.id) this.#setThreadMember(d.id, d);
+        break;
+      case "THREAD_MEMBERS_UPDATE": {
+        const me = this.me?.id;
+        const added = ((d.added_members ?? []) as AnyRecord[]).find((m) => m.user_id === me);
+        if (added) this.#setThreadMember(d.id, added);
+        if (me && ((d.removed_member_ids ?? []) as string[]).includes(me)) this.#setThreadMember(d.id, null);
+        const thread = this.channels.get(d.id);
+        if (thread && typeof d.member_count === "number") this.channels.set(d.id, { ...this.channels.get(d.id)!, member_count: d.member_count });
+        break;
+      }
       case "CHANNEL_UNREAD_UPDATE":
         for (const u of (d.channel_unread_updates ?? []) as AnyRecord[]) this.#bumpLastMessage(u.id, u.last_message_id);
         break;
@@ -821,6 +847,13 @@ export class Store {
     return has(this.permissionsFor(channel), permission);
   }
 
+  /** Server-wide permission (before channel overwrites), e.g. creating events. */
+  canInGuild(guildId: string, permission: bigint): boolean {
+    const guild = this.guilds.get(guildId);
+    if (!guild || !this.me) return false;
+    return has(basePermissions(guild, this.myMembers.get(guildId), this.me.id), permission);
+  }
+
   canSend(channel: Channel): boolean {
     const perms = this.permissionsFor(channel);
     return has(perms, isThread(channel) ? Permission.SendMessagesInThreads : Permission.SendMessages);
@@ -920,7 +953,10 @@ export class Store {
     const channel = this.channels.get(channelId);
     if (!channel?.last_message_id) return false;
     const rs = this.readStates.get(channelId);
-    return !rs?.last_message_id || isNewer(channel.last_message_id, String(rs.last_message_id));
+    if (rs?.last_message_id) return isNewer(channel.last_message_id, String(rs.last_message_id));
+    // A joined thread you've never opened counts as read up to when you joined.
+    const joined = channel.member?.join_timestamp ? Date.parse(channel.member.join_timestamp) : NaN;
+    return Number.isNaN(joined) || snowflakeToMs(channel.last_message_id) > joined;
   }
 
   mentionCount(channelId: string): number {

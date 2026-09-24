@@ -89,7 +89,13 @@ const P = {
 const everyone = [me, ...Object.values(P)];
 
 const perms = String(
-  Permission.ViewChannel | Permission.SendMessages | Permission.ReadMessageHistory | Permission.AddReactions | Permission.AttachFiles | Permission.EmbedLinks,
+  Permission.ViewChannel |
+    Permission.SendMessages |
+    Permission.SendMessagesInThreads |
+    Permission.ReadMessageHistory |
+    Permission.AddReactions |
+    Permission.AttachFiles |
+    Permission.EmbedLinks,
 );
 
 interface DemoGuild {
@@ -248,6 +254,24 @@ const mentions: Message[] = [
 ];
 messages[sid(502)] = messages[sid(502)]!.filter((m) => m.id !== oldQuestion.id).concat(oldQuestion).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
 
+// A thread you've joined under #trip-planning (it shows in the channel list).
+const CARPOOL = sid(260);
+say(CARPOOL, P.sam, 95, "Who's driving Saturday? I can take 3 from North Park", { guild_id: sid(200) });
+say(CARPOOL, P.jordan, 70, "I'll take the rest, leaving 5:45 from the Trader Joe's lot", { guild_id: sid(200) });
+const carpool = {
+  id: CARPOOL,
+  type: 11,
+  guild_id: sid(200),
+  parent_id: sid(202),
+  name: "Carpool for Saturday",
+  owner_id: P.sam.id,
+  last_message_id: messages[CARPOOL]!.at(-1)!.id,
+  message_count: 2,
+  member_count: 4,
+  thread_metadata: { archived: false, auto_archive_duration: 4320 },
+  member: { join_timestamp: isoAt(100), flags: 1 },
+};
+
 // Events posted in channels instead of as Discord events: a bot's card and its listing, and a plain announcement.
 const planner: User = { ...person(sid(109), "planner", "Planner", "📅", "#e6e1f5"), bot: true };
 const unix = (iso: string) => Math.floor(Date.parse(iso) / 1000);
@@ -339,9 +363,13 @@ function ready() {
     guilds: guilds.map((g) => ({
       id: g.id,
       properties: { name: g.name, icon: g.icon, owner_id: P.priya.id },
-      roles: [{ id: g.id, name: "@everyone", permissions: perms, position: 0 }, ...(g.roles ?? []).map((r) => ({ ...r, permissions: "0" }))],
+      // Trail Crew lets everyone create events.
+      roles: [
+        { id: g.id, name: "@everyone", permissions: g.id === G.trail.id ? String(BigInt(perms) | Permission.CreateEvents) : perms, position: 0 },
+        ...(g.roles ?? []).map((r) => ({ ...r, permissions: "0" })),
+      ],
       channels: channelsOf(g),
-      threads: [],
+      threads: g.id === G.trail.id ? [carpool] : [],
       emojis: [],
       stickers: [],
       member_count: g.members,
@@ -478,6 +506,12 @@ export function demoPlatform(): Platform {
           if (path.startsWith("/gifs/")) return [] as T;
           if (/messages\/search$/.test(path)) return { messages: [], total_results: 0 } as T;
           throw new Error(`${path} isn't part of the demo`);
+        }
+        if (method === "POST" && (m = /^\/guilds\/(\d+)\/scheduled-events$/.exec(path))) {
+          const body = (opts?.json ?? {}) as Record<string, unknown>;
+          const event = { ...body, id: msToSnowflake(Date.now()), guild_id: m[1]!, status: 1, user_count: 1, creator_id: me.id } as unknown as ScheduledEvent;
+          events.push(event);
+          return event as T;
         }
         if (method === "POST" && (m = /^\/channels\/(\d+)\/messages$/.exec(path))) {
           const body = (opts?.json ?? {}) as { content?: string; nonce?: string };

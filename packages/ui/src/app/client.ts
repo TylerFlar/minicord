@@ -1012,14 +1012,30 @@ export class MinicordClient {
     this.update = status;
     this.signals.touch("update");
     const fresh = was.state !== status.state || was.version !== status.version;
-    if (fresh && status.state === "ready") this.toast(`minicord ${status.version} is ready`, "info", { label: "Restart", run: () => this.installUpdate() }, true);
-    else if (fresh && status.state === "available") this.toast(`minicord ${status.version} is out`, "info", { label: "Download", run: () => this.installUpdate() }, true);
+    if (fresh && status.state === "ready") this.toast(`minicord ${status.version} is ready`, "info", { label: "Restart", run: () => void this.installUpdate() }, true);
+    else if (fresh && status.state === "available") this.toast(`minicord ${status.version} is out`, "info", { label: "Update", run: () => void this.installUpdate() }, true);
     else if (!quiet && status.state === "none") this.toast("You're on the latest version.", "info");
     else if (!quiet && status.state === "error") this.toast("Couldn't check for updates.", "warn");
   }
 
-  installUpdate(): void {
-    this.platform.shell.installUpdate?.(this.update);
+  async installUpdate(): Promise<void> {
+    const status = this.update;
+    const install = this.platform.shell.installUpdate;
+    if (!install) return;
+    if (status.state !== "available") return void install(status);
+    // Android: the APK downloads here, then Android's installer takes over.
+    this.#setUpdate({ ...status, state: "downloading" });
+    try {
+      await install(status);
+    } catch {
+      this.toast("Couldn't download the update.", "warn");
+    }
+    this.#setUpdate(status);
+  }
+
+  #setUpdate(status: UpdateStatus): void {
+    this.update = status;
+    this.signals.touch("update");
   }
 
   // ---- presence ---------------------------------------------------------------

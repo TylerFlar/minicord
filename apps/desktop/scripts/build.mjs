@@ -21,15 +21,13 @@ export const esbuildOptions = (entry, outfile) => ({
   logLevel: "warning",
 });
 
-/** App icon (PNG + multi-size ICO) and the installer's sidebar/header images, all generated from icons.ts. */
+/** App icon (PNG + multi-size ICO), generated from icons.ts. */
 export async function writeIcons() {
-  const { appIconIco, appIconPng, installerHeaderBmp, installerSidebarBmp } = await import("../src/main/icons.ts");
+  const { appIconIco, appIconPng } = await import("../src/main/icons.ts");
   const dir = join(dist, "icons");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "icon.png"), appIconPng(512));
   writeFileSync(join(dir, "icon.ico"), appIconIco());
-  writeFileSync(join(dir, "installerSidebar.bmp"), installerSidebarBmp());
-  writeFileSync(join(dir, "installerHeader.bmp"), installerHeaderBmp());
 }
 
 async function main() {

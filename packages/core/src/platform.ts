@@ -89,8 +89,8 @@ export interface Platform {
     checkForUpdates?(): Promise<UpdateStatus>;
     /** Pushed status changes (desktop: download progress/ready). Shells without it are polled via checkForUpdates. */
     onUpdateStatus?(fn: (status: UpdateStatus) => void): () => void;
-    /** Desktop: restart into the downloaded update. Android: open the APK download. */
-    installUpdate?(status: UpdateStatus): void;
+    /** Desktop: restart into the downloaded update. Android: download the APK and open the installer. */
+    installUpdate?(status: UpdateStatus): void | Promise<void>;
   };
 }
 

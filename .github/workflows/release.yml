@@ -114,4 +114,4 @@ jobs:
           body: |
             **Windows:** download `minicord-Setup-*.exe` and run it. It isn't code-signed yet, so SmartScreen may ask: *More info → Run anyway*. The app updates itself from here afterwards.
 
-            **Android:** download `minicord-*.apk` on your phone and open it (allow installs from your browser when asked). The app tells you when a newer APK is out.
+            **Android:** download `minicord-*.apk` on your phone and open it (allow installs from your browser when asked). After that, minicord updates itself.

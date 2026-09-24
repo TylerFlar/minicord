@@ -75,35 +75,6 @@ function render(size: number, shade: (x: number, y: number) => RGBA | null): Buf
   return encodePng(size, size, rasterize(size, size, shade));
 }
 
-/** 24-bit BMP over an opaque background (NSIS installer images must be BMP). */
-function encodeBmp(width: number, height: number, rgba: Buffer, background: RGBA): Buffer {
-  const rowSize = Math.ceil((width * 3) / 4) * 4;
-  const pixels = Buffer.alloc(rowSize * height);
-  for (let y = 0; y < height; y++) {
-    const row = (height - 1 - y) * rowSize; // bottom-up
-    for (let x = 0; x < width; x++) {
-      const o = (y * width + x) * 4;
-      const a = rgba[o + 3]! / 255;
-      pixels[row + x * 3] = Math.round(rgba[o + 2]! * a + background[2] * (1 - a));
-      pixels[row + x * 3 + 1] = Math.round(rgba[o + 1]! * a + background[1] * (1 - a));
-      pixels[row + x * 3 + 2] = Math.round(rgba[o]! * a + background[0] * (1 - a));
-    }
-  }
-  const header = Buffer.alloc(54);
-  header.write("BM", 0, "ascii");
-  header.writeUInt32LE(54 + pixels.length, 2);
-  header.writeUInt32LE(54, 10);
-  header.writeUInt32LE(40, 14);
-  header.writeInt32LE(width, 18);
-  header.writeInt32LE(height, 22);
-  header.writeUInt16LE(1, 26);
-  header.writeUInt16LE(24, 28);
-  header.writeUInt32LE(pixels.length, 34);
-  header.writeInt32LE(2835, 38);
-  header.writeInt32LE(2835, 42);
-  return Buffer.concat([header, pixels]);
-}
-
 const ACCENT: RGBA = [63, 125, 112, 255];
 const WHITE: RGBA = [255, 255, 255, 255];
 
@@ -163,38 +134,4 @@ export function appIconIco(sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]): Buff
     offset += png.length;
   });
   return Buffer.concat([header, entries, ...images]);
-}
-
-const WARM: RGBA = [246, 244, 240, 255];
-
-/** NSIS welcome/finish sidebar (164×314): the teal tile with the bubble, near the top. */
-export function installerSidebarBmp(): Buffer {
-  const w = 164;
-  const h = 314;
-  const tile = 88;
-  const left = (w - tile) / 2 / w;
-  const top = 56 / h;
-  const rgba = rasterize(w, h, (x, y) => {
-    const tx = (x - left) / (tile / w);
-    const ty = (y - top) / (tile / h);
-    if (tx >= 0 && tx <= 1 && ty >= 0 && ty <= 1 && inRoundedSquare(tx, ty, 0.22)) return bubble(tx, ty) ?? ACCENT;
-    return null;
-  });
-  return encodeBmp(w, h, rgba, WARM);
-}
-
-/** NSIS page header image (150×57): a small tile at the right edge. */
-export function installerHeaderBmp(): Buffer {
-  const w = 150;
-  const h = 57;
-  const tile = 40;
-  const left = (w - tile - 10) / w;
-  const top = (h - tile) / 2 / h;
-  const rgba = rasterize(w, h, (x, y) => {
-    const tx = (x - left) / (tile / w);
-    const ty = (y - top) / (tile / h);
-    if (tx >= 0 && tx <= 1 && ty >= 0 && ty <= 1 && inRoundedSquare(tx, ty, 0.22)) return bubble(tx, ty) ?? ACCENT;
-    return null;
-  });
-  return encodeBmp(w, h, rgba, [255, 255, 255, 255]);
 }

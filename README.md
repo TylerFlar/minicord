@@ -95,7 +95,7 @@ Grab the latest files from **[Releases](https://github.com/TylerFlar/minicord/re
 | Platform | File | Notes |
 | --- | --- | --- |
 | Windows 10/11 | `minicord-Setup-x.y.z.exe` | Not code-signed yet, so SmartScreen may warn you: **More info → Run anyway**. The app updates itself. |
-| Android 8+ | `minicord-x.y.z.apk` | Open it on your phone and allow installs from your browser. The app tells you when a newer version is out. |
+| Android 8+ | `minicord-x.y.z.apk` | Open it on your phone and allow installs from your browser. After that, minicord updates itself: tap **Update** when a new version is out (Android asks once to allow installs from minicord). |
 
 Sign in on Discord's own login page (captcha and 2FA work as usual). Your session stays on your device and is only ever sent to Discord.
 
@@ -150,7 +150,7 @@ The workflow signs the APK with the key in these repository secrets: `ANDROID_KE
 packages/core   gateway, REST, store, vault rules, session host (platform-agnostic TypeScript)
 packages/ui     React screens and the client that drives them (desktop and phone layouts)
 apps/desktop    Electron shell: session in the main process, installer, auto-updates
-apps/android    Capacitor shell + Kotlin runtime: background connection, notifications, update checks
+apps/android    Capacitor shell + Kotlin runtime: background connection, notifications, updates
 ```
 
 ## License

@@ -228,12 +228,12 @@ export function SettingsScreen() {
         <Card>
           <Row label={`minicord ${client.appVersion ?? ""}`.trim()} {...(updateHint ? { hint: updateHint } : {})}>
             {client.update.state === "ready" ? (
-              <Button tone="accent" size="sm" onClick={() => client.installUpdate()}>
+              <Button tone="accent" size="sm" onClick={() => void client.installUpdate()}>
                 Restart to update
               </Button>
             ) : client.update.state === "available" ? (
-              <Button tone="accent" size="sm" onClick={() => client.installUpdate()}>
-                Download {client.update.version}
+              <Button tone="accent" size="sm" onClick={() => void client.installUpdate()}>
+                Update to {client.update.version}
               </Button>
             ) : (
               <Button size="sm" disabled={client.update.state === "checking" || client.update.state === "downloading"} onClick={() => void client.checkForUpdates()}>

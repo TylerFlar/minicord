@@ -265,6 +265,21 @@ class MinicordPlugin : Plugin(), MinicordRuntime.UiSink {
         io.execute { call.resolve(JSObject.fromJSONObject(Updates.check(BuildConfig.VERSION_NAME))) }
     }
 
+    /** Downloads the latest release's APK (looked up here, not taken from the UI) and opens the installer. */
+    @PluginMethod
+    fun installUpdate(call: PluginCall) {
+        io.execute {
+            try {
+                val status = Updates.check(BuildConfig.VERSION_NAME)
+                if (status.optString("state") != "available") return@execute call.reject(status.optString("message", "no update"))
+                Updates.install(context, Updates.download(context, status))
+                call.resolve()
+            } catch (e: Exception) {
+                call.reject(e.message ?: "download failed")
+            }
+        }
+    }
+
     @PluginMethod
     fun permissionStatus(call: PluginCall) {
         call.resolve(permissions())

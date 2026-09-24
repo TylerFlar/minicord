@@ -33,6 +33,7 @@ interface MinicordNative {
   permissionStatus(): Promise<PermissionState>;
   appInfo(): Promise<{ version: string }>;
   checkForUpdate(): Promise<UpdateStatus>;
+  installUpdate(): Promise<void>;
   requestAppPermissions(): Promise<PermissionState>;
   addListener(event: "gatewayEvent", fn: (e: { raw: string }) => void): Promise<PluginListenerHandle>;
   addListener(event: "gatewayStatus", fn: (e: { status: GatewayStatus }) => void): Promise<PluginListenerHandle>;
@@ -113,7 +114,7 @@ export function capacitorPlatform(): Platform {
       permissions: () => Native.permissionStatus(),
       requestPermissions: () => Native.requestAppPermissions(),
       checkForUpdates: () => Native.checkForUpdate(),
-      installUpdate: (status) => void (status.url && Native.openExternal({ url: status.url })),
+      installUpdate: () => Native.installUpdate(),
     },
   };
 }

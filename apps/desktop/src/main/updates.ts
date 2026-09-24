@@ -3,6 +3,7 @@ import { app } from "electron";
 import electronUpdater from "electron-updater";
 
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+const RETRY_AFTER_MS = 10 * 60 * 1000;
 
 /**
  * Updates from GitHub releases (electron-updater reads latest.yml there). They download
@@ -27,7 +28,13 @@ export function setupUpdates(broadcast: (status: UpdateStatus) => void) {
   autoUpdater.on("update-available", (info) => set({ state: "downloading", version: info.version }));
   autoUpdater.on("update-not-available", () => set({ state: "none" }));
   autoUpdater.on("update-downloaded", (info) => set({ state: "ready", version: info.version }));
-  autoUpdater.on("error", (err) => set({ state: "error", message: err.message }));
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  autoUpdater.on("error", (err) => {
+    set({ state: "error", message: err.message });
+    // Offline or a network blip (check or download): try again soon rather than in 6 hours.
+    clearTimeout(retry);
+    retry = setTimeout(() => void check(), RETRY_AFTER_MS);
+  });
 
   const check = async (): Promise<UpdateStatus> => {
     if (status.state === "ready" || status.state === "downloading") return status;

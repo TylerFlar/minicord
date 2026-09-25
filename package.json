@@ -1,7 +1,7 @@
 {
   "name": "minicord",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A calm Discord client for Windows and Android",
   "license": "MIT",
   "repository": {

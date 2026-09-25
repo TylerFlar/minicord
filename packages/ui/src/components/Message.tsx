@@ -21,6 +21,7 @@ import {
   Pin,
   Play,
   Shield,
+  Smile,
   SmilePlus,
   Trash2,
 } from "lucide-react";
@@ -29,13 +30,14 @@ import type { MinicordClient } from "../app/client.ts";
 import { useClient, useSignals } from "../app/context.tsx";
 import { parseEmojiText, pointFrom, type MenuEntry, type PickedEmoji } from "../app/overlay.ts";
 import { emojiUrl, stickerUrl } from "../lib/cdn.ts";
-import { DEFAULT_REACTIONS, emojiName, replaceShortcodes, useEmojiData } from "../lib/emoji.ts";
+import { DEFAULT_REACTIONS, replaceShortcodes, useEmojiData } from "../lib/emoji.ts";
 import { formatBytes, formatClock, formatFull, formatRelative, formatSpan, formatTime } from "../lib/format.ts";
 import { messagePreview } from "../lib/preview.ts";
 import { isTouch, useLongPress } from "../lib/responsive.ts";
 import { Avatar } from "./Avatar.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { MessageComponents } from "./MessageComponents.tsx";
+import { Reactions } from "./Reactions.tsx";
 import { Button } from "./ui.tsx";
 
 export interface MessagePerms {
@@ -113,6 +115,7 @@ function messageMenu(client: MinicordClient, msg: Message, perms: MessagePerms, 
   if (perms.react) {
     items.push({ reactions: true, onPick: react, onMore: () => client.openOverlay({ kind: "emoji", ...at, ...(guildId ? { guildId } : {}), onPick: react }) });
   }
+  if (msg.reactions?.length) items.push({ label: "View reactions", icon: <Smile size={16} />, onSelect: () => client.openOverlay({ kind: "reactions", message: msg }) });
   if (mine && isChatMessage(msg)) items.push({ label: "Edit message", icon: <Pencil size={16} />, onSelect: () => client.startEdit(msg.id) });
   if (perms.send) items.push({ label: "Reply", icon: <CornerUpLeft size={16} />, onSelect: () => onReply(msg) });
   if (isChatMessage(msg)) items.push({ label: "Forward", icon: <Forward size={16} />, onSelect: () => client.openOverlay({ kind: "forward", message: msg }) });
@@ -587,38 +590,6 @@ function ThreadChip({ message }: { message: Message }) {
         </span>
       </span>
     </button>
-  );
-}
-
-function Reactions({ message, canReact, onAdd }: { message: Message; canReact: boolean; onAdd: (e: MouseEvent) => void }) {
-  const client = useClient();
-  const data = useEmojiData();
-  return (
-    <div className="mt-1 flex flex-wrap items-center gap-1">
-      {message.reactions!.map((r, i) => {
-        const e = r.emoji;
-        const label = e.id ? e.name : (emojiName(data, e.name ?? "") ?? e.name);
-        return (
-          <button
-            key={i}
-            title={`:${label}:`}
-            disabled={!canReact}
-            onClick={() => void client.toggleReaction(message, e)}
-            className={`inline-flex h-[26px] items-center gap-1.5 rounded-lg border px-1.5 text-[13px] ${
-              r.me ? "border-accent/60 bg-accent-soft text-accent" : "border-transparent bg-sunken text-muted enabled:hover:border-line"
-            }`}
-          >
-            {e.id ? <img src={emojiUrl(e.id, false, 32)} alt={label ?? ""} className="h-4 w-4 object-contain" /> : <span className="text-[15px] leading-none">{e.name}</span>}
-            <span className="font-semibold tabular-nums">{r.count}</span>
-          </button>
-        );
-      })}
-      {canReact && !isTouch() && (
-        <button onClick={onAdd} aria-label="Add reaction" className="hidden h-[26px] items-center rounded-lg bg-sunken px-1.5 text-muted hover:text-text group-hover:inline-flex">
-          <SmilePlus size={16} />
-        </button>
-      )}
-    </div>
   );
 }
 

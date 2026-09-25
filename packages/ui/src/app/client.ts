@@ -13,7 +13,9 @@ import {
   makeNonce,
   Permission,
   postedEvents,
+  reactionCounts,
   rules as R,
+  sameEmoji,
   snowflakeToMs,
   Store,
   type Activity,
@@ -37,6 +39,7 @@ import {
   type ScheduledEvent,
   type SelectComponent,
   type UpdateStatus,
+  type User,
   type UserProfile,
 } from "@minicord/core";
 import { messagePreview } from "../lib/preview.ts";
@@ -79,6 +82,24 @@ export interface CommandEntry {
 /** One option value as typed in the command form. */
 export type OptionValue = string | number | boolean;
 
+/** Who reacted with one emoji, as far as it's loaded. */
+export interface Reactors {
+  users: User[];
+  /** More pages to load. */
+  more: boolean;
+  loading: boolean;
+  failed: boolean;
+}
+
+interface ReactorPages extends Reactors {
+  /** The reaction's count when this was fetched: a different count means someone reacted since. */
+  count: number;
+  /** The list the next page comes from: 0 regular reactions, then 1 super reactions. */
+  type: 0 | 1;
+  after?: string;
+  request?: Promise<void>;
+}
+
 interface QueuedNotice {
   title: string;
   body: string;
@@ -92,7 +113,7 @@ const MESSAGE_LINK = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/chan
 const DISMISSED_KEY = "inbox-dismissed";
 const REMINDED_KEY = "event-reminders";
 const PAGE = 50;
-const LARGE_GUILD = 75_000;
+const REACTOR_PAGE = 100;
 const PASS_GRACE_MS = 60_000;
 const DAY = 86_400_000;
 
@@ -153,6 +174,8 @@ export class MinicordClient {
   #lastMemberSub = "";
   #favoriteGifs: Promise<FavoriteGif[]> | null = null;
   #posted = new WeakMap<Message, PostedEvent[]>();
+  /** `${messageId}:${emoji}` -> who reacted, most recently fetched last. */
+  #reactors = new Map<string, ReactorPages>();
 
   constructor(platform: Platform) {
     this.platform = platform;
@@ -228,6 +251,8 @@ export class MinicordClient {
   #afterReady(): void {
     this.#subscribedGuilds.clear();
     this.#lastMemberSub = "";
+    // A fresh session starts with no subscriptions: renew the one for the server on screen.
+    if (this.route.view === "server") this.#subscribeGuild(this.route.guildId);
     if (!this.rules.onboarded) this.route = { view: "onboarding" };
     this.signals.touch("route", "status", "ready");
     void this.#refreshMentions();
@@ -534,11 +559,13 @@ export class MinicordClient {
     return undefined;
   }
 
-  /** Large guilds aren't auto-subscribed; subscribe when the user actually opens one, like the web client. */
+  /**
+   * Subscribe to a server when the user opens one, like the web client: that's what brings its
+   * typing events (and, for servers over 75k members, its messages at all).
+   */
   #subscribeGuild(guildId: string): void {
     if (this.#subscribedGuilds.has(guildId)) return;
     this.#subscribedGuilds.add(guildId);
-    if ((this.store.guilds.get(guildId)?.member_count ?? 0) < LARGE_GUILD) return;
     this.platform.session.send(GatewayOp.GuildSubscriptionsBulk, {
       subscriptions: {
         [guildId]: { typing: true, threads: false, activities: true, member_updates: false, members: [], thread_member_lists: [], channels: {} },
@@ -622,6 +649,8 @@ export class MinicordClient {
       return false;
     }
     const nonce = makeNonce();
+    // Sending ends this bout of typing, so the next keystroke announces itself again (like Discord).
+    this.#lastTyping.delete(channelId);
     this.store.addPendingMessage({
       id: `pending-${nonce}`,
       nonce,
@@ -704,6 +733,68 @@ export class MinicordClient {
     } catch (err) {
       this.#reportError(err, "Couldn't react");
     }
+  }
+
+  /** Who reacted with `emoji` on `msg`, as far as it's loaded (see loadReactors). */
+  reactorsOf(msg: Message, emoji: Emoji): Reactors | undefined {
+    return this.#reactors.get(`${msg.id}:${emoji.id ?? emoji.name}`);
+  }
+
+  /**
+   * Fetch who reacted with `emoji`: the first page (regular reactions, then super reactions), or
+   * with `more` the next one. Kept per message and emoji until the reaction's count changes.
+   */
+  loadReactors(msg: Message, emoji: Emoji, more = false): Promise<void> {
+    const reaction = msg.reactions?.find((r) => sameEmoji(r.emoji, emoji));
+    if (!reaction) return Promise.resolve();
+    const key = `${msg.id}:${emoji.id ?? emoji.name}`;
+    const { normal, burst } = reactionCounts(reaction);
+    let pages = this.#reactors.get(key);
+    if (!pages || pages.count !== reaction.count || (pages.failed && !pages.users.length && !pages.request)) {
+      pages = { users: [], more: true, loading: false, failed: false, count: reaction.count, type: normal > 0 ? 0 : 1 };
+    } else if (pages.request || !more || !pages.more) {
+      return pages.request ?? Promise.resolve();
+    }
+    this.#reactors.delete(key);
+    this.#reactors.set(key, pages);
+    if (this.#reactors.size > 200) this.#reactors.delete(this.#reactors.keys().next().value!);
+
+    const p = pages;
+    p.loading = true;
+    p.failed = false;
+    p.request = (async () => {
+      try {
+        let added = 0;
+        while (p.more && added < REACTOR_PAGE) {
+          const page = await this.api.reactions(msg.channel_id, msg.id, emoji, { type: p.type, limit: REACTOR_PAGE, ...(p.after ? { after: p.after } : {}) });
+          this.store.rememberUsers(page);
+          const known = new Set(p.users.map((u) => u.id));
+          const fresh = page.filter((u) => !known.has(u.id));
+          p.users = [...p.users, ...fresh];
+          added += fresh.length;
+          const last = page.at(-1)?.id;
+          if (page.length < REACTOR_PAGE || !last || last === p.after) {
+            if (p.type === 0 && burst > 0) {
+              p.type = 1;
+              delete p.after;
+            } else {
+              p.more = false;
+            }
+          } else {
+            p.after = last;
+          }
+        }
+      } catch (err) {
+        p.failed = true;
+        console.warn("Couldn't load reactions", err);
+      } finally {
+        p.loading = false;
+        delete p.request;
+        this.signals.touch("reactors");
+      }
+    })();
+    this.signals.touch("reactors");
+    return p.request;
   }
 
   /** Called while a channel is on screen with its newest messages visible. */

@@ -1,4 +1,4 @@
-import type { InteractionModal, Message } from "@minicord/core";
+import type { Emoji, InteractionModal, Message } from "@minicord/core";
 import type { ReactNode } from "react";
 
 export interface PickedEmoji {
@@ -25,6 +25,7 @@ export type Overlay =
   | { kind: "switcher" }
   | { kind: "search"; channelId: string; guildId?: string }
   | { kind: "forward"; message: Message }
+  | { kind: "reactions"; message: Message; emoji?: Emoji }
   | { kind: "modal"; modal: InteractionModal }
   | { kind: "members"; channelId: string }
   | {

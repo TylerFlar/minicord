@@ -91,6 +91,18 @@ async function conversationExtras() {
     await shot("profile");
     await escape();
   }
+  // Who reacted: the tooltip on a reaction, then everyone from the message menu.
+  const reacted = win.locator('[id^="msg-"]:has(button[aria-label^=":"])').last();
+  if (await reacted.count()) {
+    await reacted.locator('button[aria-label^=":"]').first().hover();
+    await win.getByRole("tooltip").getByText("reacted with").waitFor({ timeout: 10_000 }).catch(() => {});
+    await shot("reaction-tooltip");
+    await reacted.click({ button: "right", position: { x: 200, y: 12 } });
+    await win.getByRole("button", { name: "View reactions" }).click();
+    await win.getByRole("dialog", { name: "Reactions" }).locator("img[src*='avatars']").first().waitFor({ timeout: 10_000 }).catch(() => {});
+    await shot("reactions");
+    await escape();
+  }
   await win.getByRole("button", { name: "Pinned messages" }).click();
   await shot("pins");
   await escape();
@@ -212,8 +224,29 @@ async function writeTour() {
   const text = `minicord UI test ${stamp} :wave:`;
   const has = (t) => [...document.querySelectorAll('[id^="msg-"]')].some((el) => !el.id.startsWith("msg-pending-") && el.textContent?.includes(t));
 
+  // Opening the server subscribed it to typing, so your own typing comes back over the gateway.
+  const typingEcho = win.evaluate(
+    (channelId) =>
+      new Promise((resolve, reject) => {
+        const store = window.__minicord.store;
+        const apply = store.apply.bind(store);
+        const timer = setTimeout(() => ((store.apply = apply), reject(new Error("no TYPING_START from the server"))), 15_000);
+        store.apply = (e) => {
+          if (e.t === "TYPING_START" && e.d.channel_id === channelId) {
+            clearTimeout(timer);
+            store.apply = apply;
+            resolve();
+          }
+          return apply(e);
+        };
+      }),
+    testChannel,
+  );
+
   // Send (the :wave: shortcode should arrive as 👋).
   await box.fill(text);
+  await typingEcho;
+  console.log("[shoot] typing reached the server and came back");
   await win.keyboard.press("Enter");
   await win.waitForFunction(has, `minicord UI test ${stamp} 👋`, { timeout: 15_000 });
   await shot("ui-write-sent");
@@ -227,13 +260,25 @@ async function writeTour() {
   await win.keyboard.press("Enter");
   await win.waitForFunction(has, "(edited in minicord)", { timeout: 15_000 });
 
-  // React with a quick reaction, then remove it.
+  // React with a quick reaction, see who reacted (you), then remove it.
   const message = win.locator('[id^="msg-"]', { hasText: stamp }).last();
   await message.hover();
   await message.locator("div.absolute button").first().click();
-  await win.waitForFunction((t) => [...document.querySelectorAll('[id^="msg-"]')].some((el) => el.textContent?.includes(t) && el.querySelector('button[title^=":"]')), stamp, { timeout: 15_000 });
+  await win.waitForFunction((t) => [...document.querySelectorAll('[id^="msg-"]')].some((el) => el.textContent?.includes(t) && el.querySelector('button[aria-label^=":"]')), stamp, { timeout: 15_000 });
   await shot("ui-write-reacted");
-  await message.locator('button[title^=":"]').first().click();
+  const me = await win.evaluate((channelId) => {
+    const store = window.__minicord.store;
+    return store.displayName(store.me.id, store.channels.get(channelId)?.guild_id);
+  }, testChannel);
+  await message.locator('button[aria-label^=":"]').first().hover();
+  await win.getByRole("tooltip").getByText(`${me} reacted with`).waitFor({ timeout: 15_000 });
+  await shot("ui-write-reaction-tooltip");
+  await message.click({ button: "right", position: { x: 200, y: 12 } });
+  await win.getByRole("button", { name: "View reactions" }).click();
+  await win.getByRole("dialog", { name: "Reactions" }).getByText(me, { exact: true }).waitFor({ timeout: 15_000 });
+  await shot("ui-write-reactions");
+  await escape();
+  await message.locator('button[aria-label^=":"]').first().click();
 
   // Upload an image.
   await win.locator('input[type="file"]').setInputFiles({ name: "minicord-test.png", mimeType: "image/png", buffer: testPng() });

@@ -81,9 +81,9 @@ Discord is where your friends are. It's also where the endless scroll is. minico
 Everything else works the way you know from Discord:
 
 - DMs, group DMs, servers, threads and forums (reading and posting)
-- Replies, reactions, emoji, GIF and sticker pickers, attachments (paste or drag and drop), polls, voice messages, forwards
+- Replies, reactions (and who reacted), emoji, GIF and sticker pickers, attachments (paste or drag and drop), polls, voice messages, forwards
 - Slash commands and bot buttons, menus and forms
-- Member list, online status, profiles, pins, search, and a quick switcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>)
+- Member list, online status, typing indicators, profiles, pins, search, and a quick switcher (<kbd>Ctrl</kbd>+<kbd>K</kbd>)
 - Each server's events, and creating your own; light or dark theme, or follow the system
 - Your server folder order; mutes, read state and collapsed categories stay in sync with Discord
 - Calls open in Discord's own web client, so voice, video and screen share just work

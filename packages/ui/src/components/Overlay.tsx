@@ -11,6 +11,7 @@ import { ExpressionPicker } from "./ExpressionPicker.tsx";
 import { MemberList } from "./MemberList.tsx";
 import { NewEventForm } from "./NewEvent.tsx";
 import { ForwardPicker, PinsPanel, ProfileCard, QuickSwitcher, SearchPanel, ThreadsPanel } from "./Panels.tsx";
+import { ReactionsViewer } from "./Reactions.tsx";
 import { Button } from "./ui.tsx";
 
 /** Phones get bottom sheets; everything else floats at the pointer. */
@@ -277,6 +278,8 @@ export function OverlayHost() {
       );
     case "forward":
       return <ForwardPicker message={overlay.message} />;
+    case "reactions":
+      return <ReactionsViewer message={overlay.message} {...(overlay.emoji ? { emoji: overlay.emoji } : {})} />;
     case "modal":
       return <BotModal modal={overlay.modal} />;
     case "members": {

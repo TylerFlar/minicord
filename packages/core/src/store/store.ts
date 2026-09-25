@@ -9,6 +9,7 @@ import {
   type Member,
   type Message,
   type Presence,
+  type Reaction,
   type ReadState,
   type Relationship,
   type Role,
@@ -618,10 +619,14 @@ export class Store {
         break;
 
       case "TYPING_START": {
-        if (d.guild_id || d.user_id === this.me?.id) break; // typing is only shown in DMs
+        if (!d.channel_id || !d.user_id || d.user_id === this.me?.id) break;
+        // Server typing carries the member, so names and nicknames resolve for people we haven't seen yet.
+        if (d.guild_id && d.member) this.#rememberMember(d.guild_id, d.member as Member);
+        const now = Date.now();
         let map = this.typing.get(d.channel_id);
         if (!map) this.typing.set(d.channel_id, (map = new Map()));
-        map.set(d.user_id, Date.now() + TYPING_MS);
+        for (const [userId, until] of map) if (until <= now) map.delete(userId);
+        map.set(d.user_id, now + TYPING_MS);
         this.touch(`typing:${d.channel_id}`);
         break;
       }
@@ -699,16 +704,20 @@ export class Store {
 
   #onReaction(d: AnyRecord, delta: 1 | -1): void {
     const mine = d.user_id === this.me?.id;
+    const burst = d.burst === true || d.type === 1;
+    if (d.guild_id && d.member) this.#rememberMember(d.guild_id, d.member as Member);
     this.#patchMessage(d.channel_id, d.message_id, (m) => {
       const reactions = [...(m.reactions ?? [])];
       const idx = reactions.findIndex((r) => sameEmoji(r.emoji, d.emoji));
       if (idx < 0) {
-        if (delta > 0) reactions.push({ emoji: d.emoji, count: 1, me: mine });
+        if (delta > 0) reactions.push({ emoji: d.emoji, count: 1, count_details: { normal: burst ? 0 : 1, burst: burst ? 1 : 0 }, me: mine });
       } else {
         const r = reactions[idx]!;
         const count = r.count + delta;
+        const { normal, burst: supers } = reactionCounts(r);
+        const count_details = burst ? { normal, burst: Math.max(0, supers + delta) } : { normal: Math.max(0, normal + delta), burst: supers };
         if (count <= 0) reactions.splice(idx, 1);
-        else reactions[idx] = { ...r, count, me: mine ? delta > 0 : r.me };
+        else reactions[idx] = { ...r, count, count_details, me: mine ? delta > 0 : r.me };
       }
       return { ...m, reactions };
     });
@@ -788,6 +797,11 @@ export class Store {
   rememberMembers(guildId: string, members: Member[]): void {
     for (const m of members) this.#rememberMember(guildId, m);
     this.touch(`members:${guildId}`, "members");
+  }
+
+  /** Users fetched over REST (who reacted), so their names resolve like everyone else's. */
+  rememberUsers(users: User[]): void {
+    for (const u of users) this.users.set(u.id, { ...this.users.get(u.id), ...u });
   }
 
   setRsvps(eventIds: Iterable<string>): void {
@@ -1022,16 +1036,30 @@ export class Store {
     return this.messages.get(channelId);
   }
 
+  /** Who's typing in a channel right now: not you, and not people you've blocked (like Discord). */
   typingIn(channelId: string, now = Date.now()): User[] {
     const map = this.typing.get(channelId);
     if (!map) return [];
     return [...map.entries()]
-      .filter(([, until]) => until > now)
+      .filter(([id, until]) => until > now && id !== this.me?.id && !this.isBlocked(id))
       .map(([id]) => this.users.get(id))
       .filter((u): u is User => !!u);
   }
+
+  /** When the next person typing in a channel stops counting as typing, if anyone is. */
+  typingUntil(channelId: string, now = Date.now()): number | undefined {
+    let next: number | undefined;
+    for (const until of this.typing.get(channelId)?.values() ?? []) if (until > now && (next === undefined || until < next)) next = until;
+    return next;
+  }
 }
 
-function sameEmoji(a: { id?: string | null; name?: string | null }, b: { id?: string | null; name?: string | null }): boolean {
+export function sameEmoji(a: { id?: string | null; name?: string | null }, b: { id?: string | null; name?: string | null }): boolean {
   return a.id ? a.id === b.id : a.name === b.name;
+}
+
+/** Regular and super-reaction counts; older payloads only have `count` (and maybe `burst_count`). */
+export function reactionCounts(r: Reaction): { normal: number; burst: number } {
+  const burst = r.count_details?.burst ?? r.burst_count ?? 0;
+  return { normal: r.count_details?.normal ?? Math.max(0, r.count - burst), burst };
 }

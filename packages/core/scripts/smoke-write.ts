@@ -1,8 +1,8 @@
 /**
  * Live write test in a channel you configure (MINICORD_TEST_CHANNEL_ID in .env). Exercises the
  * real code paths — DiscordApi + gateway + Store — and verifies each step through gateway events:
- * send → react → unreact → edit → reply → typing → ack → delete. Refuses to run unless the
- * channel is in a server you own.
+ * send → react → who reacted → unreact → edit → reply → typing → ack → delete. Refuses to run
+ * unless the channel is in a server you own.
  *
  *   pnpm smoke:write
  */
@@ -13,6 +13,7 @@ import {
   fetchBuildNumber,
   fetchChromeMajor,
   fetchHttp,
+  GatewayOp,
   makeNonce,
   Store,
   webIdentity,
@@ -100,6 +101,12 @@ async function main() {
     await added;
   });
 
+  await step("list who reacted", async () => {
+    if (!sent) throw new Error("no message");
+    const users = await api.reactions(channelId, sent.id, { id: null, name: "👍" });
+    if (!users.some((u) => u.id === store.me?.id)) throw new Error("you're not in the list");
+  });
+
   await step("remove reaction", async () => {
     if (!sent) throw new Error("no message");
     const removed = waitFor("MESSAGE_REACTION_REMOVE", (e) => e.t === "MESSAGE_REACTION_REMOVE" && (e.d as { message_id: string }).message_id === sent!.id);
@@ -124,8 +131,15 @@ async function main() {
     if (reply.referenced_message?.id !== sent.id) throw new Error("reply has no referenced_message");
   });
 
-  await step("typing indicator", async () => {
+  await step("typing indicator (servers send it once subscribed, as the UI does on opening one)", async () => {
+    session.gateway.send(GatewayOp.GuildSubscriptionsBulk, {
+      subscriptions: { [guild.id]: { typing: true, threads: false, activities: true, member_updates: false, members: [], thread_member_lists: [], channels: {} } },
+    });
+    await sleep(1000);
+    const typed = waitFor("TYPING_START", (e) => e.t === "TYPING_START" && (e.d as { channel_id: string }).channel_id === channelId);
     await api.typing(channelId);
+    const d = (await typed).d as { member?: { user?: { id: string } } };
+    if (d.member?.user?.id !== store.me?.id) throw new Error("TYPING_START came without the member");
   });
 
   await step("mark read (ack)", async () => {

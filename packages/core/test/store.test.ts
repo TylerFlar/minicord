@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { GatewayClient } from "../src/gateway/client.ts";
 import type { SocketFactory } from "../src/gateway/socket.ts";
 import { SessionHost } from "../src/host/session-host.ts";
-import { Store } from "../src/store/store.ts";
+import { DiscordApi } from "../src/rest/api.ts";
+import type { RequestOptions } from "../src/rest/client.ts";
+import { reactionCounts, Store } from "../src/store/store.ts";
 import { Permission } from "../src/permissions.ts";
 import { decodeGuildFolders } from "../src/util/proto.ts";
-import type { GatewayDispatch } from "../src/types.ts";
+import type { GatewayDispatch, Message } from "../src/types.ts";
 
 const VIEW_SEND = String(Permission.ViewChannel | Permission.SendMessages | Permission.ReadMessageHistory);
 
@@ -277,5 +279,96 @@ describe("SessionHost replay", () => {
     for (const e of snap.backlog) replica.apply(e);
     expect(replica.channels.get("general")?.last_message_id).toBe("702");
     expect(replica.channels.get("dm-sam")?.last_message_id).toBe("950");
+  });
+});
+
+describe("Typing", () => {
+  it("shows people typing in servers under their server nickname", () => {
+    const store = new Store();
+    store.hydrate(readyPayload());
+    // Server typing carries the member (as the gateway sends it once subscribed with typing: true).
+    store.apply(dispatch("TYPING_START", { channel_id: "general", guild_id: "g1", user_id: "robin", timestamp: 1, member: { user: { id: "robin", username: "robin" }, roles: [], nick: "Rob" } }));
+    expect(store.typingIn("general").map((u) => u.id)).toEqual(["robin"]);
+    expect(store.displayName("robin", "g1")).toBe("Rob");
+  });
+
+  it("leaves out yourself and people you've blocked, and expires after 10 s", () => {
+    const store = new Store();
+    store.hydrate(readyPayload());
+    store.apply(dispatch("RELATIONSHIP_ADD", { id: "alex", type: 2, user: { id: "alex", username: "alex" } }));
+    for (const user_id of ["me", "alex", "sam"]) store.apply(dispatch("TYPING_START", { channel_id: "group", user_id, timestamp: 1 }));
+    expect(store.typingIn("group").map((u) => u.id)).toEqual(["sam"]);
+
+    const now = Date.now();
+    expect(store.typingUntil("group", now)! - now).toBeGreaterThan(9_000);
+    expect(store.typingIn("group", now + 10_001)).toEqual([]);
+    expect(store.typingUntil("group", now + 10_001)).toBeUndefined();
+  });
+
+  it("stops showing someone once their message arrives", () => {
+    const store = new Store();
+    store.hydrate(readyPayload());
+    store.apply(dispatch("TYPING_START", { channel_id: "dm-sam", user_id: "sam", timestamp: 1 }));
+    expect(store.typingIn("dm-sam")).toHaveLength(1);
+    store.apply(dispatch("MESSAGE_CREATE", { id: "951", channel_id: "dm-sam", author: { id: "sam", username: "sam" }, content: "hi", timestamp: "", mention_everyone: false, mentions: [], mention_roles: [], attachments: [], embeds: [], type: 0 }));
+    expect(store.typingIn("dm-sam")).toEqual([]);
+  });
+});
+
+describe("Reactions", () => {
+  const message = (reactions: Message["reactions"]): Message => ({
+    id: "700",
+    channel_id: "general",
+    guild_id: "g1",
+    author: { id: "sam", username: "sam" },
+    content: "",
+    timestamp: "",
+    mention_everyone: false,
+    mentions: [],
+    mention_roles: [],
+    attachments: [],
+    embeds: [],
+    type: 0,
+    ...(reactions ? { reactions } : {}),
+  });
+  const react = (t: string, user_id: string, emoji: { id: string | null; name: string }, burst = false, extra = {}) =>
+    dispatch(t, { channel_id: "general", guild_id: "g1", message_id: "700", user_id, emoji, burst, type: burst ? 1 : 0, ...extra });
+
+  it("keeps regular and super reaction counts apart", () => {
+    const store = new Store();
+    store.hydrate(readyPayload());
+    const thumbs = { id: null, name: "👍" };
+    store.setMessagePage("general", [message([{ emoji: thumbs, count: 2, me: false, count_details: { normal: 2, burst: 0 } }])], "latest", 50);
+    store.apply(react("MESSAGE_REACTION_ADD", "sam", thumbs, true));
+    store.apply(react("MESSAGE_REACTION_REMOVE", "alex", thumbs));
+    store.apply(react("MESSAGE_REACTION_ADD", "me", { id: "9", name: "party" }));
+    const [first, second] = store.messagesOf("general")!.messages[0]!.reactions!;
+    expect(first).toMatchObject({ count: 2, count_details: { normal: 1, burst: 1 }, me: false });
+    expect(second).toMatchObject({ count: 1, count_details: { normal: 1, burst: 0 }, me: true });
+  });
+
+  it("reads counts from older payloads, and remembers who reacted", () => {
+    expect(reactionCounts({ emoji: { id: null, name: "👍" }, count: 5, me: false, burst_count: 2 })).toEqual({ normal: 3, burst: 2 });
+    expect(reactionCounts({ emoji: { id: null, name: "👍" }, count: 5, me: false })).toEqual({ normal: 5, burst: 0 });
+
+    const store = new Store();
+    store.hydrate(readyPayload());
+    store.apply(react("MESSAGE_REACTION_ADD", "robin", { id: null, name: "👍" }, false, { member: { user: { id: "robin", username: "robin" }, roles: [], nick: "Rob" } }));
+    expect(store.displayName("robin", "g1")).toBe("Rob");
+    store.rememberUsers([{ id: "kim", username: "kim", global_name: "Kim" }]);
+    expect(store.displayName("kim")).toBe("Kim");
+  });
+
+  it("lists who reacted through the reactions endpoint, custom emoji as name:id", async () => {
+    const calls: [string, string, RequestOptions | undefined][] = [];
+    const api = new DiscordApi(async <T>(method: string, path: string, opts?: RequestOptions) => {
+      calls.push([method, path, opts]);
+      return [] as T;
+    });
+    await api.reactions("c1", "m1", { id: "42", name: "party" }, { type: 1, after: "7" });
+    await api.reactions("c1", "m1", { id: null, name: "👍" });
+    expect(calls[0]).toEqual(["GET", "/channels/c1/messages/m1/reactions/party%3A42", { query: { limit: 100, type: 1, after: "7" } }]);
+    expect(calls[1]![1]).toBe(`/channels/c1/messages/m1/reactions/${encodeURIComponent("👍")}`);
+    expect(calls[1]![2]).toEqual({ query: { limit: 100, type: 0, after: undefined } });
   });
 });

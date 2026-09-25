@@ -1,5 +1,5 @@
 import { contextProperties } from "../properties.ts";
-import type { Channel, CommandIndex, Emoji, Message, ScheduledEvent, UserGuildSettings, UserProfile } from "../types.ts";
+import type { Channel, CommandIndex, Emoji, Message, ScheduledEvent, User, UserGuildSettings, UserProfile } from "../types.ts";
 import { DISCORD_EPOCH, makeNonce } from "../util/snowflake.ts";
 import type { Query, RequestOptions } from "./client.ts";
 
@@ -162,6 +162,15 @@ export class DiscordApi {
   removeReaction(channelId: string, messageId: string, emoji: Emoji): Promise<void> {
     return this.#request<void>("DELETE", `/channels/${channelId}/messages/${messageId}/reactions/${encodeEmoji(emoji)}/0/@me`, {
       query: { location: "Message", burst: false },
+    });
+  }
+
+  /** Who reacted with `emoji`, in user-id order: type 0 for regular reactions, 1 for super reactions; page with `after`. */
+  reactions(channelId: string, messageId: string, emoji: Emoji, opts: { type?: 0 | 1; after?: string; limit?: number } = {}): Promise<User[]> {
+    return this.#get<User[]>(`/channels/${channelId}/messages/${messageId}/reactions/${encodeEmoji(emoji)}`, {
+      limit: opts.limit ?? 100,
+      type: opts.type ?? 0,
+      after: opts.after,
     });
   }
 

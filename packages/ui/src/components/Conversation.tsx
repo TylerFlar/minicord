@@ -9,6 +9,7 @@ import { Avatar } from "./Avatar.tsx";
 import { Composer } from "./Composer.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { PassBanner, usePassExpiry } from "./PassBanner.tsx";
+import { TypingIndicator } from "./Typing.tsx";
 import { IconButton } from "./ui.tsx";
 
 const THREAD_TYPES = new Set<number>([ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread]);
@@ -16,7 +17,7 @@ const THREAD_TYPES = new Set<number>([ChannelType.PublicThread, ChannelType.Priv
 /** A single channel: header, messages, composer. Used for DMs, open-server channels, threads and passes. */
 export function Conversation({ channelId, anchor, onBack }: { channelId: string; anchor?: string; onBack?: () => void }) {
   const client = useSignals(["rules", "focus"]);
-  const store = useStore([`channel:${channelId}`, "dms", `typing:${channelId}`, "channels", "presences"]);
+  const store = useStore([`channel:${channelId}`, "dms", "channels", "presences"]);
   const mobile = useIsMobile();
   const [membersShown, setMembersShown] = useLocalFlag("mc:members", true);
   const channel = store.channels.get(channelId);
@@ -44,7 +45,6 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
   const recipients = store.recipients(channel);
   const name = store.channelName(channel);
   const canWrite = client.canSendIn(channel);
-  const typing = store.typingIn(channelId).filter((u) => u.id !== store.me?.id);
   const blocked = !access.allowed ? "Vaulted. Open a pass from the vault to reply." : !store.canSend(channel) ? "You can't send messages here." : undefined;
   const threads = !isDm && !isGroup && !isThread && channel.type !== ChannelType.GuildVoice;
   // In a vaulted server you only ever see one channel (a pass, or an event channel): no member list,
@@ -177,23 +177,7 @@ export function Conversation({ channelId, anchor, onBack }: { channelId: string;
             files={files}
             setFiles={setFiles}
           />
-          <div className="flex h-6 shrink-0 items-center gap-1.5 px-4 text-[12.5px] text-muted">
-            {typing.length > 0 && (
-              <>
-                <span className="typing-dots" aria-hidden>
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span className="truncate">
-                  <span className="font-semibold text-text/80">
-                    {typing.length > 3 ? "Several people" : typing.map((u) => store.displayName(u.id, channel.guild_id)).join(", ")}
-                  </span>
-                  {typing.length === 1 ? " is typing…" : " are typing…"}
-                </span>
-              </>
-            )}
-          </div>
+          <TypingIndicator channel={channel} />
         </div>
         {memberList && membersShown && !mobile && <MemberList channel={channel} />}
       </div>

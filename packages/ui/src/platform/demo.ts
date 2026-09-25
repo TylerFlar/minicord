@@ -188,8 +188,12 @@ say(sid(201), P.lena, 300, "Welcome to everyone who joined this week 👋");
 say(sid(201), P.kai, 140, "Anyone have a spare headlamp for Saturday?");
 say(sid(201), P.jordan, 131, "I have two, I'll bring one");
 
+/** Who reacted with what, by `${messageId}:${emoji}`, in user-id order (as Discord lists them). */
+const reactors = new Map<string, User[]>();
+
 const plan = say(sid(202), P.priya, 95, "Sunrise hike on Saturday? Torrey Pines, south lot at 6 🌄");
-say(sid(202), P.sam, 92, "in! I'll bring coffee ☕", { reactions: [{ emoji: { id: null, name: "☕" }, count: 4, me: true }] });
+const coffee = say(sid(202), P.sam, 92, "in! I'll bring coffee ☕", { reactions: [{ emoji: { id: null, name: "☕" }, count: 4, me: true }] });
+reactors.set(`${coffee.id}:☕`, [me, P.priya, P.jordan, P.kai]);
 say(sid(202), P.jordan, 90, "", {
   poll: {
     question: { text: "Which trail?" },
@@ -215,6 +219,7 @@ const readUpTo = say(sid(202), P.mika, 40, "can we make it 6:30? 6 is brutal �
   message_reference: { message_id: plan.id, channel_id: sid(202), guild_id: sid(200) },
   reactions: [{ emoji: { id: null, name: "😂" }, count: 3, me: false }],
 });
+reactors.set(`${readUpTo.id}:😂`, [P.sam, P.priya, P.theo]);
 say(sid(202), P.priya, 38, `6:30 it is. <@${me.id}> are you driving?`, { mentions: [me] });
 say(sid(202), P.theo, 12, "last time we went 👇", {
   attachments: [{ id: sid(900), filename: "torrey-pines.jpg", size: 48_000, url: sunrise(), proxy_url: "", content_type: "image/jpeg" }],
@@ -476,9 +481,14 @@ export function demoPlatform(): Platform {
     session: {
       async attach(h) {
         handlers = h;
-        // Sam is always about to say something.
-        setInterval(() => emit("TYPING_START", { channel_id: DM_SAM, user_id: P.sam.id, timestamp: Math.floor(Date.now() / 1000) }), 7000);
-        emit("TYPING_START", { channel_id: DM_SAM, user_id: P.sam.id, timestamp: Math.floor(Date.now() / 1000) });
+        // Sam is always about to say something, and so is Priya in #trip-planning.
+        const typing = () => {
+          const timestamp = Math.floor(Date.now() / 1000);
+          emit("TYPING_START", { channel_id: DM_SAM, user_id: P.sam.id, timestamp });
+          emit("TYPING_START", { channel_id: sid(202), guild_id: G.trail.id, user_id: P.priya.id, timestamp, member: { user: P.priya, roles: G.trail.member[P.priya.id], nick: null } });
+        };
+        setInterval(typing, 7000);
+        typing();
         return { status: "ready", ready: { t: "READY", s: 1, d: ready() }, supplemental: null, backlog: [] };
       },
       send(op, d) {
@@ -499,6 +509,13 @@ export function demoPlatform(): Platform {
             return events.filter((e) => rsvps.has(e.id) && ids.includes(e.guild_id)).map((e) => ({ guild_scheduled_event_id: e.id, user_id: me.id })) as T;
           }
           if ((m = /^\/users\/(\d+)\/profile$/.exec(path))) return profile(m[1]!) as T;
+          if ((m = /^\/channels\/\d+\/messages\/(\d+)\/reactions\/([^/]+)$/.exec(path))) {
+            // Nobody here super-reacts.
+            if (Number(opts?.query?.type ?? 0) === 1) return [] as T;
+            const after = opts?.query?.after ? BigInt(String(opts.query.after)) : -1n;
+            const users = (reactors.get(`${m[1]}:${decodeURIComponent(m[2]!)}`) ?? []).filter((u) => BigInt(u.id) > after);
+            return users.slice(0, Number(opts?.query?.limit ?? 25)) as T;
+          }
           if (/\/pins$/.test(path)) return [] as T;
           if (/threads\/search$/.test(path)) return { threads: [], has_more: false } as T;
           if (/application-command-index$/.test(path)) return { applications: [], application_commands: [] } as T;
@@ -536,8 +553,13 @@ export function demoPlatform(): Platform {
           emit("MESSAGE_CREATE", msg);
           return msg as T;
         }
-        if ((m = /^\/channels\/(\d+)\/messages\/(\d+)\/reactions\/([^/]+)\/@me$/.exec(path))) {
-          const [name, id] = decodeURIComponent(m[3]!).split(":");
+        // Reacting is PUT .../{emoji}/@me; un-reacting is DELETE .../{emoji}/{type}/@me.
+        if ((m = /^\/channels\/(\d+)\/messages\/(\d+)\/reactions\/([^/]+)(?:\/\d)?\/@me$/.exec(path))) {
+          const emoji = decodeURIComponent(m[3]!);
+          const [name, id] = emoji.split(":");
+          const key = `${m[2]}:${emoji}`;
+          const others = (reactors.get(key) ?? []).filter((u) => u.id !== me.id);
+          reactors.set(key, method === "PUT" ? [me, ...others] : others);
           emit(method === "PUT" ? "MESSAGE_REACTION_ADD" : "MESSAGE_REACTION_REMOVE", {
             user_id: me.id,
             channel_id: m[1],

@@ -3,6 +3,7 @@ import { ArrowLeft, BellOff, Check, CheckCheck, MessageCircle, MoreVertical, Plu
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Avatar } from "../components/Avatar.tsx";
 import { Conversation } from "../components/Conversation.tsx";
+import { useTyping } from "../components/Typing.tsx";
 import { Empty, IconButton, Modal } from "../components/ui.tsx";
 import type { MinicordClient } from "../app/client.ts";
 import { useClient, useStore } from "../app/context.tsx";
@@ -72,7 +73,7 @@ function DmList({ selected, mobile }: { selected?: string; mobile: boolean }) {
                     <Users size={16} />
                   </span>
                 ) : (
-                  <DmAvatar userId={c.recipient_ids?.[0]} />
+                  <DmAvatar channelId={c.id} userId={c.recipient_ids?.[0]} />
                 )}
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate text-[15px] ${unread || active ? "font-semibold text-text" : "text-muted"}`}>{store.channelName(c)}</span>
@@ -95,13 +96,14 @@ function DmList({ selected, mobile }: { selected?: string; mobile: boolean }) {
   );
 }
 
-/** A DM avatar with the person's status when we know it (friends). */
-function DmAvatar({ userId }: { userId: string | undefined }) {
+/** A DM avatar with the person's status when we know it (friends), and typing dots while they type to you. */
+function DmAvatar({ channelId, userId }: { channelId: string; userId: string | undefined }) {
   const store = useClient().store;
+  const typing = useTyping(channelId).some((u) => u.id === userId);
   const user = userId ? store.users.get(userId) : undefined;
   const presence = userId ? store.presenceOf(userId) : undefined;
   const friend = !!userId && store.relationships.get(userId)?.type === RelationshipType.Friend;
-  return <Avatar user={user} size={32} {...(presence || friend ? { status: effectiveStatus(presence) } : {})} />;
+  return <Avatar user={user} size={32} typing={typing} {...(presence || friend ? { status: effectiveStatus(presence) } : {})} />;
 }
 
 function DmSubline({ userId }: { userId: string | undefined }) {

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Fragment, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 type Tone = "default" | "accent" | "quiet" | "danger" | "danger-solid";
 
@@ -67,6 +67,20 @@ export function Modal({ title, children, onClose }: { title: string; children: R
         {children}
       </div>
     </div>
+  );
+}
+
+/** People the way Discord lists them: "A", "A and B", "A, B, and C", "A, B, C, and 4 others". */
+export function NameList({ names, others = 0 }: { names: ReactNode[]; others?: number }) {
+  const items = others > 0 ? [...names, `${others} ${others === 1 ? "other" : "others"}`] : names;
+  if (items.length < 3) return <>{items.length === 2 ? <>{items[0]} and {items[1]}</> : items[0]}</>;
+  return (
+    <>
+      {items.slice(0, -1).map((item, i) => (
+        <Fragment key={i}>{item}, </Fragment>
+      ))}
+      and {items.at(-1)}
+    </>
   );
 }
 
